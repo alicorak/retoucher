@@ -1,0 +1,15 @@
+{
+  "name": "Annotate for Claude",
+  "id": "figma-annotate-claude-dev",
+  "api": "1.0.0",
+  "editorType": ["figma"],
+  "main": "code.js",
+  "ui": "ui.html",
+  "enablePrivatePluginApi": true,
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["none"],
+    "devAllowedDomains": ["http://localhost:4747"],
+    "reasoning": "Sends notes to a local bridge that Claude Code reads."
+  }
+}

@@ -1,0 +1,247 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 12px/1.45 Inter, system-ui, sans-serif; color: var(--figma-color-text); background: var(--figma-color-bg); display: flex; flex-direction: column; height: 100vh; }
+  .muted { color: var(--figma-color-text-secondary); }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--figma-color-border); }
+  header b { font-weight: 600; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: var(--figma-color-icon-danger); }
+  .dot.on { background: var(--figma-color-icon-success); }
+  .composer { padding: 12px; border-bottom: 1px solid var(--figma-color-border); display: flex; flex-direction: column; gap: 8px; }
+  .target { display: flex; gap: 8px; align-items: center; min-height: 44px; }
+  .thumb { width: 44px; height: 44px; border-radius: 4px; border: 1px solid var(--figma-color-border); background: var(--figma-color-bg-secondary) center/contain no-repeat; flex: none; }
+  .target .name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  textarea, input[type=text] { width: 100%; font: inherit; color: inherit; background: var(--figma-color-bg-secondary); border: 1px solid transparent; border-radius: 5px; padding: 8px; resize: none; outline: none; }
+  textarea:focus, input[type=text]:focus { border-color: var(--figma-color-border-selected); }
+  .row { display: flex; gap: 6px; align-items: center; }
+  .seg { display: flex; background: var(--figma-color-bg-secondary); border-radius: 5px; padding: 2px; flex: 1; }
+  .seg button { flex: 1; border: 0; background: transparent; color: var(--figma-color-text-secondary); font: inherit; padding: 4px 0; border-radius: 4px; cursor: pointer; }
+  .seg button.on { background: var(--figma-color-bg); color: var(--figma-color-text); box-shadow: 0 0 0 1px var(--figma-color-border); }
+  .send { border: 0; border-radius: 6px; background: var(--figma-color-bg-brand); color: var(--figma-color-text-onbrand); font: inherit; font-weight: 500; padding: 8px 12px; cursor: pointer; }
+  .send:disabled { opacity: .4; cursor: default; }
+  .list { flex: 1; overflow-y: auto; padding: 6px 0 12px; }
+  .empty { padding: 24px 12px; text-align: center; }
+  .item { padding: 10px 12px; border-bottom: 1px solid var(--figma-color-border); cursor: pointer; }
+  .item:hover { background: var(--figma-color-bg-hover); }
+  .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .chip { font-size: 10px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--figma-color-border); }
+  .chip.pending { color: var(--figma-color-text-secondary); }
+  .chip.working { color: var(--figma-color-text-brand); border-color: var(--figma-color-border-brand); }
+  .chip.question { color: var(--figma-color-text-warning); border-color: var(--figma-color-border-warning); }
+  .chip.done { color: var(--figma-color-text-success); border-color: var(--figma-color-border-success); }
+  .msg { margin-top: 6px; padding: 6px 8px; border-radius: 5px; background: var(--figma-color-bg-secondary); white-space: pre-wrap; }
+  .msg.claude { background: var(--figma-color-bg-brand-tertiary); }
+  .msg small { display: block; font-size: 10px; margin-bottom: 2px; color: var(--figma-color-text-secondary); }
+  .reply { margin-top: 6px; }
+  .link { background: none; border: 0; color: var(--figma-color-text-secondary); font: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
+  .setup { padding: 10px 12px; border-bottom: 1px solid var(--figma-color-border); background: var(--figma-color-bg-warning-tertiary); display: none; }
+  .setup.show { display: block; }
+  .setup input { margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <b>Annotate for Claude</b>
+  <span class="muted" id="conn"><span class="dot" id="dot"></span><span id="connText">connecting</span></span>
+</header>
+
+<div class="setup" id="setup">
+  Figma didn't share this file's key. Paste the file's URL once so Claude knows which file to open.
+  <input type="text" id="fileUrl" placeholder="https://www.figma.com/design/…">
+</div>
+
+<div class="composer">
+  <div class="target">
+    <div class="thumb" id="thumb"></div>
+    <div style="min-width:0">
+      <div class="name" id="tName">Nothing selected</div>
+      <div class="muted" id="tMeta">Select a layer, then describe the change.</div>
+    </div>
+  </div>
+  <textarea id="note" rows="3" placeholder="What should change? (⌘↵ to send)"></textarea>
+  <div class="row">
+    <div class="seg" id="intent">
+      <button data-v="change" class="on">Change</button>
+      <button data-v="fix">Fix</button>
+      <button data-v="add">Add</button>
+      <button data-v="question">Ask</button>
+    </div>
+    <div class="seg" id="priority" style="flex:.6">
+      <button data-v="normal" class="on">Normal</button>
+      <button data-v="urgent">Urgent</button>
+    </div>
+  </div>
+  <button class="send" id="send" disabled>Send to Claude</button>
+</div>
+
+<div class="list" id="list"><div class="empty muted">No notes yet.</div></div>
+
+<script>
+const BRIDGE = 'http://localhost:4747';
+let ctx = { fileKey: null, fileName: '', pageName: '' };
+let sel = { nodes: [], total: 0, image: null };
+let items = [];
+let online = false;
+let thumbUrl = null;
+const replyDrafts = {};
+
+const $ = id => document.getElementById(id);
+const post = m => parent.postMessage({ pluginMessage: m }, '*');
+
+function fileKeyFromUrl(u) {
+  const m = /figma\.com\/(?:design|file|board)\/([A-Za-z0-9]+)/.exec(u || '');
+  return m ? m[1] : null;
+}
+function effectiveKey() { return ctx.fileKey || fileKeyFromUrl($('fileUrl').value); }
+
+window.onmessage = e => {
+  const m = e.data.pluginMessage;
+  if (!m) return;
+  if (m.type === 'context') { ctx = m; $('setup').classList.toggle('show', !effectiveKey()); refresh(); }
+  if (m.type === 'saved-file-url') { $('fileUrl').value = m.value; $('setup').classList.toggle('show', !effectiveKey()); refresh(); }
+  if (m.type === 'selection') { sel = m; renderTarget(); }
+};
+
+function renderTarget() {
+  if (thumbUrl) URL.revokeObjectURL(thumbUrl);
+  thumbUrl = sel.image ? URL.createObjectURL(new Blob([sel.image], { type: 'image/png' })) : null;
+  $('thumb').style.backgroundImage = thumbUrl ? `url(${thumbUrl})` : '';
+  if (!sel.nodes.length) {
+    $('tName').textContent = 'Nothing selected';
+    $('tMeta').textContent = 'Select a layer, then describe the change.';
+  } else {
+    const first = sel.nodes[0];
+    $('tName').textContent = sel.total > 1 ? `${first.name} + ${sel.total - 1} more` : first.name;
+    $('tMeta').textContent = sel.total > 1 ? `${sel.total} layers selected` : `${first.type.toLowerCase()} · ${first.w}×${first.h}`;
+  }
+  updateSend();
+}
+
+function updateSend() {
+  $('send').disabled = !(online && sel.nodes.length && $('note').value.trim() && effectiveKey());
+}
+
+function seg(id) {
+  const root = $(id);
+  root.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    root.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  });
+  return () => root.querySelector('.on').dataset.v;
+}
+const getIntent = seg('intent');
+const getPriority = seg('priority');
+
+function toBase64(bytes) {
+  let s = ''; const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(s);
+}
+
+async function submit() {
+  if ($('send').disabled) return;
+  $('send').disabled = true;
+  try {
+    const r = await fetch(BRIDGE + '/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileKey: effectiveKey(), fileName: ctx.fileName, pageName: ctx.pageName,
+        nodes: sel.nodes, note: $('note').value,
+        intent: getIntent(), priority: getPriority(),
+        image: sel.image ? toBase64(sel.image) : null,
+      }),
+    });
+    if (!r.ok) throw new Error((await r.json()).error);
+    $('note').value = '';
+    post({ type: 'notify', text: 'Sent to Claude' });
+    await refresh();
+  } catch (err) {
+    post({ type: 'notify', text: 'Could not send: ' + err.message });
+  }
+  updateSend();
+}
+
+$('send').onclick = submit;
+$('note').addEventListener('input', updateSend);
+$('note').addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit(); });
+$('fileUrl').addEventListener('input', () => {
+  post({ type: 'save-file-url', value: $('fileUrl').value });
+  $('setup').classList.toggle('show', !effectiveKey());
+  refresh();
+});
+
+async function refresh() {
+  try {
+    const key = effectiveKey();
+    const r = await fetch(BRIDGE + '/annotations' + (key ? `?fileKey=${key}` : ''));
+    items = (await r.json()).reverse();
+    setOnline(true);
+    renderList();
+  } catch { setOnline(false); }
+}
+
+function setOnline(v) {
+  online = v;
+  $('dot').classList.toggle('on', v);
+  $('connText').textContent = v ? 'Claude connected' : 'bridge offline';
+  updateSend();
+}
+
+const LABEL = { pending: 'Waiting', working: 'Claude is working', question: 'Needs your answer', done: 'Done' };
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function renderList() {
+  // Don't clobber a reply the user is typing.
+  const active = document.activeElement;
+  if (active && active.classList && active.classList.contains('replyInput')) return;
+  if (!items.length) { $('list').innerHTML = '<div class="empty muted">No notes yet.</div>'; return; }
+  $('list').innerHTML = items.map(it => {
+    const thread = it.thread.map(t => `<div class="msg ${t.from}"><small>${t.from === 'claude' ? 'Claude' : 'You'}</small>${esc(t.text)}</div>`).join('');
+    const canReply = it.status === 'question' || it.status === 'done';
+    return `<div class="item" data-id="${it.id}" data-nodes="${it.nodes.map(n => n.id).join(',')}">
+      <div class="top"><span class="muted">#${it.id} · ${esc(it.nodes[0] ? it.nodes[0].name : '')}</span><span class="chip ${it.status}">${LABEL[it.status]}</span></div>
+      <div>${esc(it.note)}</div>${thread}
+      ${canReply ? `<div class="reply"><input class="replyInput" type="text" data-id="${it.id}" value="${esc(replyDrafts[it.id] || '')}" placeholder="${it.status === 'question' ? 'Answer Claude…' : 'Not quite right? Say why…'}"></div>` : ''}
+      <div style="margin-top:6px"><button class="link" data-del="${it.id}">Delete</button></div>
+    </div>`;
+  }).join('');
+}
+
+$('list').addEventListener('click', async e => {
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    await fetch(`${BRIDGE}/annotations/${del.dataset.del}`, { method: 'DELETE' });
+    return refresh();
+  }
+  if (e.target.classList.contains('replyInput')) return;
+  const item = e.target.closest('.item');
+  if (item && item.dataset.nodes) post({ type: 'focus', ids: item.dataset.nodes.split(',').filter(Boolean) });
+});
+
+$('list').addEventListener('input', e => {
+  if (e.target.classList.contains('replyInput')) replyDrafts[e.target.dataset.id] = e.target.value;
+});
+$('list').addEventListener('keydown', async e => {
+  if (!e.target.classList.contains('replyInput') || e.key !== 'Enter') return;
+  const id = e.target.dataset.id, text = e.target.value.trim();
+  if (!text) return;
+  await fetch(`${BRIDGE}/annotations/${id}/messages`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: 'user', text }),
+  });
+  delete replyDrafts[id];
+  e.target.blur();
+  refresh();
+});
+
+post({ type: 'ready' });
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
