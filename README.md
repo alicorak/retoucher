@@ -18,7 +18,7 @@ Figma plugin  ──POST──▶  local bridge (localhost:4747)  ◀──fa CL
 ### 1. Get the code
 
 ```bash
-git clone https://github.com/alicorak/figma-annotate.git
+git clone https://github.com/madebyecho/figma-annotate.git
 cd figma-annotate
 ```
 
