@@ -6,7 +6,10 @@
 //   fa done <id> "message"      reply and mark done
 //   fa ask <id> "question"      reply and mark as needing the user's answer
 //   fa say <id> "message"       reply without changing status
+//   fa snapshot <id> before|after <png>   store a before/after screenshot (shown in the plugin)
+//   fa patch <id> <json-file>   store the revert patch so the plugin can Undo (see CLAUDE.md)
 //   fa watch                    print one line per new/updated pending item (for Monitor)
+import fs from 'node:fs';
 const BASE = `http://localhost:${process.env.FA_PORT || 4747}`;
 
 async function api(path, opts = {}) {
@@ -21,6 +24,7 @@ async function api(path, opts = {}) {
 }
 
 const oneLine = s => String(s).replace(/\s+/g, ' ').slice(0, 140);
+const batchLabel = it => (it.batchId ? ` [batch ${it.batchId}]` : '');
 const nodesLabel = it => it.nodes.map(n => `${n.name} (${n.id})`).join(', ') || 'no selection';
 
 async function main() {
@@ -29,13 +33,25 @@ async function main() {
     case 'list': {
       const items = await api(`/annotations?status=${a || 'pending'}`);
       if (!items.length) return console.log('(none)');
-      for (const it of items) console.log(`#${it.id} [${it.status}] ${it.intent}/${it.priority} — ${oneLine(it.note)} — ${nodesLabel(it)}`);
+      for (const it of items) console.log(`#${it.id} [${it.status}]${batchLabel(it)} ${it.intent}/${it.priority} — ${oneLine(it.note)} — ${nodesLabel(it)}`);
       return;
     }
     case 'show': {
       const it = await api(`/annotations/${a}`);
       console.log(JSON.stringify(it, null, 2));
       return;
+    }
+    case 'snapshot': {
+      const [kind, file] = rest.length ? [rest[0], rest[1]] : [];
+      if (!['before', 'after'].includes(kind) || !file) throw new Error('usage: fa snapshot <id> before|after <png>');
+      await api(`/annotations/${a}/snapshot`, { method: 'POST', body: { kind, image: fs.readFileSync(file).toString('base64') } });
+      return console.log(`#${a} ${kind} snapshot saved`);
+    }
+    case 'patch': {
+      const file = rest[0];
+      if (!file) throw new Error('usage: fa patch <id> <json-file>');
+      await api(`/annotations/${a}/patch`, { method: 'POST', body: { patch: JSON.parse(fs.readFileSync(file, 'utf8')) } });
+      return console.log(`#${a} revert patch saved`);
     }
     case 'claim':
       await api(`/annotations/${a}`, { method: 'PATCH', body: { status: 'working' } });
@@ -59,7 +75,7 @@ async function main() {
             if (seen.get(it.id) === it.updatedAt) continue;
             seen.set(it.id, it.updatedAt);
             const followup = it.thread.at(-1)?.from === 'user' ? ' (follow-up)' : '';
-            console.log(`NEW #${it.id}${followup} ${it.intent}/${it.priority}: ${oneLine(it.thread.at(-1)?.from === 'user' ? it.thread.at(-1).text : it.note)} — ${nodesLabel(it)}`);
+            console.log(`NEW #${it.id}${followup}${batchLabel(it)} ${it.intent}/${it.priority}:${oneLine(it.thread.at(-1)?.from === 'user' ? it.thread.at(-1).text : it.note)} — ${nodesLabel(it)}`);
           }
         } catch (e) {
           if (!seen.has('__down')) { console.log('bridge unreachable, retrying'); seen.set('__down', 1); }
@@ -71,7 +87,7 @@ async function main() {
       }
     }
     default:
-      console.log('usage: fa list|show|claim|done|ask|say|watch');
+      console.log('usage: fa list|show|claim|snapshot|patch|done|ask|say|watch');
   }
 }
 

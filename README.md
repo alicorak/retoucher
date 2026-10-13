@@ -55,6 +55,12 @@ In a Claude Code session that has the Figma MCP connected, open this folder and 
 
 Claude then processes every note you send. The session must stay open; if it is closed, notes wait in the panel as "Waiting".
 
+## Features
+
+- **Batch:** *Add to batch* (⇧⌘↵) collects several notes, *Send all* delivers them together. Claude handles them in order.
+- **Canvas markers:** each open note adds a native Figma annotation ("Claude #3 · Waiting") on its layers. It updates with the status and disappears when the note is done or deleted. Toggle with *Show markers on canvas*. Other people's annotations are never touched.
+- **Before / after + Undo:** finished notes show a before and after picture. *Undo change* restores the old values Claude recorded before editing (works without Claude being online). Changes Claude couldn't record show no Undo button.
+
 ## Using it
 
 1. Select one or more layers in Figma.
@@ -77,9 +83,11 @@ Tip: select the specific layer you mean. A selection that covers a whole row of 
 | `done <id> "msg"` | Reply and mark done |
 | `ask <id> "question"` | Reply and ask the user something |
 | `say <id> "msg"` | Reply without changing status |
+| `snapshot <id> before\|after <png>` | Store a before/after screenshot shown in the panel |
+| `patch <id> <json>` | Store the revert patch behind the Undo button |
 | `watch` | One line per new note or follow-up (for a Claude Code Monitor) |
 
-Per note: `claim` → `show` (look at the screenshot) → inspect the layer through the Figma MCP → edit → screenshot to verify → `done` or `ask`.
+The full per-note procedure (including recording undo data) is in [CLAUDE.md](CLAUDE.md); Claude Code reads it automatically when started in this folder.
 
 ## Troubleshooting
 

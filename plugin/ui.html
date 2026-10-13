@@ -20,32 +20,51 @@
   .seg { display: flex; background: var(--figma-color-bg-secondary); border-radius: 5px; padding: 2px; flex: 1; }
   .seg button { flex: 1; border: 0; background: transparent; color: var(--figma-color-text-secondary); font: inherit; padding: 4px 0; border-radius: 4px; cursor: pointer; }
   .seg button.on { background: var(--figma-color-bg); color: var(--figma-color-text); box-shadow: 0 0 0 1px var(--figma-color-border); }
-  .send { border: 0; border-radius: 6px; background: var(--figma-color-bg-brand); color: var(--figma-color-text-onbrand); font: inherit; font-weight: 500; padding: 8px 12px; cursor: pointer; }
-  .send:disabled { opacity: .4; cursor: default; }
-  .list { flex: 1; overflow-y: auto; padding: 6px 0 12px; }
+  .btn { border: 0; border-radius: 6px; font: inherit; font-weight: 500; padding: 8px 12px; cursor: pointer; }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .btn.primary { background: var(--figma-color-bg-brand); color: var(--figma-color-text-onbrand); flex: 1; }
+  .btn.ghost { background: var(--figma-color-bg-secondary); color: var(--figma-color-text); }
+  .btn.small { padding: 4px 10px; font-weight: 400; }
+
+  .batch { padding: 8px 12px; border-bottom: 1px solid var(--figma-color-border); background: var(--figma-color-bg-brand-tertiary); display: none; }
+  .batch.show { display: block; }
+  .batch .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-weight: 500; }
+  .draft { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
+  .draft span.t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .batch .actions { display: flex; gap: 6px; margin-top: 6px; }
+
+  .list { flex: 1; overflow-y: auto; padding: 0 0 12px; }
   .empty { padding: 24px 12px; text-align: center; }
   .item { padding: 10px 12px; border-bottom: 1px solid var(--figma-color-border); cursor: pointer; }
   .item:hover { background: var(--figma-color-bg-hover); }
-  .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-  .chip { font-size: 10px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--figma-color-border); }
+  .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 6px; }
+  .chip { font-size: 10px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--figma-color-border); white-space: nowrap; }
   .chip.pending { color: var(--figma-color-text-secondary); }
   .chip.working { color: var(--figma-color-text-brand); border-color: var(--figma-color-border-brand); }
   .chip.question { color: var(--figma-color-text-warning); border-color: var(--figma-color-border-warning); }
   .chip.done { color: var(--figma-color-text-success); border-color: var(--figma-color-border-success); }
+  .chip.reverted { color: var(--figma-color-text-secondary); }
   .msg { margin-top: 6px; padding: 6px 8px; border-radius: 5px; background: var(--figma-color-bg-secondary); white-space: pre-wrap; }
   .msg.claude { background: var(--figma-color-bg-brand-tertiary); }
+  .msg.system { background: none; padding: 0; font-style: italic; color: var(--figma-color-text-secondary); }
   .msg small { display: block; font-size: 10px; margin-bottom: 2px; color: var(--figma-color-text-secondary); }
   .reply { margin-top: 6px; }
   .link { background: none; border: 0; color: var(--figma-color-text-secondary); font: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
+  .acts { margin-top: 8px; display: flex; gap: 10px; align-items: center; }
+  .cmp { display: flex; gap: 6px; margin-top: 8px; }
+  .cmp figure { margin: 0; flex: 1; min-width: 0; }
+  .cmp .img { height: 84px; border: 1px solid var(--figma-color-border); border-radius: 4px; background: var(--figma-color-bg-secondary) center/contain no-repeat; }
+  .cmp figcaption { font-size: 10px; margin-top: 2px; color: var(--figma-color-text-secondary); }
   .setup { padding: 10px 12px; border-bottom: 1px solid var(--figma-color-border); background: var(--figma-color-bg-warning-tertiary); display: none; }
   .setup.show { display: block; }
   .setup input { margin-top: 6px; }
+  label.tog { display: flex; align-items: center; gap: 5px; cursor: pointer; }
 </style>
 </head>
 <body>
 <header>
   <b>Annotate for Claude</b>
-  <span class="muted" id="conn"><span class="dot" id="dot"></span><span id="connText">connecting</span></span>
+  <span class="muted"><span class="dot" id="dot"></span><span id="connText">connecting</span></span>
 </header>
 
 <div class="setup" id="setup">
@@ -74,7 +93,17 @@
       <button data-v="urgent">Urgent</button>
     </div>
   </div>
-  <button class="send" id="send" disabled>Send to Claude</button>
+  <div class="row">
+    <button class="btn primary" id="send" disabled>Send to Claude</button>
+    <button class="btn ghost" id="queue" disabled title="Collect several notes, then send them together">Add to batch</button>
+  </div>
+  <label class="tog muted"><input type="checkbox" id="markers" checked> Show markers on canvas</label>
+</div>
+
+<div class="batch" id="batch">
+  <div class="head"><span id="batchTitle"></span><button class="link" id="batchClear">Clear</button></div>
+  <div id="drafts"></div>
+  <div class="actions"><button class="btn primary small" id="batchSend">Send all</button></div>
 </div>
 
 <div class="list" id="list"><div class="empty muted">No notes yet.</div></div>
@@ -86,7 +115,11 @@ let sel = { nodes: [], total: 0, image: null };
 let items = [];
 let online = false;
 let thumbUrl = null;
+let drafts = [];
+let markersOn = true;
+let lastSig = '';
 const replyDrafts = {};
+const imgCache = new Map(); // "id:kind:updatedAt" -> blob url
 
 const $ = id => document.getElementById(id);
 const post = m => parent.postMessage({ pluginMessage: m }, '*');
@@ -100,9 +133,11 @@ function effectiveKey() { return ctx.fileKey || fileKeyFromUrl($('fileUrl').valu
 window.onmessage = e => {
   const m = e.data.pluginMessage;
   if (!m) return;
-  if (m.type === 'context') { ctx = m; $('setup').classList.toggle('show', !effectiveKey()); refresh(); }
-  if (m.type === 'saved-file-url') { $('fileUrl').value = m.value; $('setup').classList.toggle('show', !effectiveKey()); refresh(); }
+  if (m.type === 'context') { ctx = m; $('setup').classList.toggle('show', !effectiveKey()); refresh(true); }
+  if (m.type === 'saved-file-url') { $('fileUrl').value = m.value; $('setup').classList.toggle('show', !effectiveKey()); refresh(true); }
   if (m.type === 'selection') { sel = m; renderTarget(); }
+  if (m.type === 'markers-pref') { markersOn = m.value; $('markers').checked = m.value; syncMarkers(); }
+  if (m.type === 'patch-result') onPatchResult(m);
 };
 
 function renderTarget() {
@@ -120,8 +155,11 @@ function renderTarget() {
   updateSend();
 }
 
+function canCompose() { return sel.nodes.length && $('note').value.trim() && effectiveKey(); }
 function updateSend() {
-  $('send').disabled = !(online && sel.nodes.length && $('note').value.trim() && effectiveKey());
+  $('send').disabled = !(online && canCompose());
+  $('queue').disabled = !canCompose();
+  $('batchSend').disabled = !online || !drafts.length;
 }
 
 function seg(id) {
@@ -141,47 +179,108 @@ function toBase64(bytes) {
   return btoa(s);
 }
 
+function currentDraft() {
+  return {
+    fileKey: effectiveKey(), fileName: ctx.fileName, pageName: ctx.pageName,
+    nodes: sel.nodes, note: $('note').value.trim(),
+    intent: getIntent(), priority: getPriority(),
+    image: sel.image ? toBase64(sel.image) : null,
+  };
+}
+
+async function postNote(body) {
+  const r = await fetch(BRIDGE + '/annotations', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error((await r.json()).error);
+}
+
 async function submit() {
   if ($('send').disabled) return;
   $('send').disabled = true;
   try {
-    const r = await fetch(BRIDGE + '/annotations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fileKey: effectiveKey(), fileName: ctx.fileName, pageName: ctx.pageName,
-        nodes: sel.nodes, note: $('note').value,
-        intent: getIntent(), priority: getPriority(),
-        image: sel.image ? toBase64(sel.image) : null,
-      }),
-    });
-    if (!r.ok) throw new Error((await r.json()).error);
+    await postNote(currentDraft());
     $('note').value = '';
     post({ type: 'notify', text: 'Sent to Claude' });
-    await refresh();
+    await refresh(true);
   } catch (err) {
     post({ type: 'notify', text: 'Could not send: ' + err.message });
   }
   updateSend();
 }
 
+// ----- batch -----
+function addToBatch() {
+  if ($('queue').disabled) return;
+  drafts.push(currentDraft());
+  $('note').value = '';
+  renderDrafts();
+  updateSend();
+}
+function renderDrafts() {
+  $('batch').classList.toggle('show', drafts.length > 0);
+  $('batchTitle').textContent = `${drafts.length} note${drafts.length === 1 ? '' : 's'} in batch`;
+  $('drafts').innerHTML = drafts.map((d, i) =>
+    `<div class="draft"><span class="muted">${i + 1}.</span><span class="t">${esc(d.nodes[0] ? d.nodes[0].name : '')}: ${esc(d.note)}</span><button class="link" data-rm="${i}">remove</button></div>`).join('');
+}
+$('drafts').addEventListener('click', e => {
+  const rm = e.target.closest('[data-rm]'); if (!rm) return;
+  drafts.splice(Number(rm.dataset.rm), 1); renderDrafts(); updateSend();
+});
+$('batchClear').onclick = () => { drafts = []; renderDrafts(); updateSend(); };
+$('batchSend').onclick = async () => {
+  if (!drafts.length) return;
+  $('batchSend').disabled = true;
+  const batchId = 'b' + Date.now().toString(36).slice(-5);
+  const total = drafts.length;
+  try {
+    while (drafts.length) {
+      await postNote({ ...drafts[0], batchId });
+      drafts.shift();
+      renderDrafts();
+    }
+    post({ type: 'notify', text: `Sent ${total} notes to Claude` });
+  } catch (err) {
+    post({ type: 'notify', text: `Sent ${total - drafts.length} of ${total}: ${err.message}` });
+  }
+  await refresh(true);
+  updateSend();
+};
+
 $('send').onclick = submit;
+$('queue').onclick = addToBatch;
 $('note').addEventListener('input', updateSend);
-$('note').addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit(); });
+$('note').addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.shiftKey ? addToBatch() : submit(); }
+});
 $('fileUrl').addEventListener('input', () => {
   post({ type: 'save-file-url', value: $('fileUrl').value });
   $('setup').classList.toggle('show', !effectiveKey());
-  refresh();
+  refresh(true);
+});
+$('markers').addEventListener('change', e => {
+  markersOn = e.target.checked;
+  post({ type: 'set-markers', value: markersOn });
+  syncMarkers();
 });
 
-async function refresh() {
+// ----- list -----
+async function refresh(force) {
   try {
     const key = effectiveKey();
     const r = await fetch(BRIDGE + '/annotations' + (key ? `?fileKey=${key}` : ''));
     items = (await r.json()).reverse();
     setOnline(true);
-    renderList();
+    const sig = JSON.stringify(items);
+    if (force || sig !== lastSig) { lastSig = sig; renderList(); syncMarkers(); }
   } catch { setOnline(false); }
+}
+
+function syncMarkers() {
+  post({
+    type: 'sync-markers', enabled: markersOn,
+    items: items.map(it => ({ id: it.id, status: it.status, note: it.note, nodeIds: it.nodes.map(n => n.id) })),
+  });
 }
 
 function setOnline(v) {
@@ -192,31 +291,73 @@ function setOnline(v) {
 }
 
 const LABEL = { pending: 'Waiting', working: 'Claude is working', question: 'Needs your answer', done: 'Done' };
-
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 
+function imgStyle(it, kind) {
+  const u = imgCache.get(`${it.id}:${kind}:${it.updatedAt}`);
+  return u ? `style="background-image:url(${u})"` : '';
+}
+
 function renderList() {
-  // Don't clobber a reply the user is typing.
   const active = document.activeElement;
   if (active && active.classList && active.classList.contains('replyInput')) return;
   if (!items.length) { $('list').innerHTML = '<div class="empty muted">No notes yet.</div>'; return; }
   $('list').innerHTML = items.map(it => {
-    const thread = it.thread.map(t => `<div class="msg ${t.from}"><small>${t.from === 'claude' ? 'Claude' : 'You'}</small>${esc(t.text)}</div>`).join('');
+    const thread = it.thread.map(t => `<div class="msg ${t.from}">${t.from === 'system' ? '' : `<small>${t.from === 'claude' ? 'Claude' : 'You'}</small>`}${esc(t.text)}</div>`).join('');
     const canReply = it.status === 'question' || it.status === 'done';
+    const showCmp = it.status === 'done' && it.hasBefore && it.hasAfter;
+    const canUndo = it.status === 'done' && it.patch && !it.reverted;
+    const batch = it.batchId ? ` · batch ${esc(it.batchId)}` : '';
     return `<div class="item" data-id="${it.id}" data-nodes="${it.nodes.map(n => n.id).join(',')}">
-      <div class="top"><span class="muted">#${it.id} · ${esc(it.nodes[0] ? it.nodes[0].name : '')}</span><span class="chip ${it.status}">${LABEL[it.status]}</span></div>
+      <div class="top"><span class="muted">#${it.id} · ${esc(it.nodes[0] ? it.nodes[0].name : '')}${batch}</span><span class="chip ${it.reverted ? 'reverted' : it.status}">${it.reverted ? 'Reverted' : LABEL[it.status]}</span></div>
       <div>${esc(it.note)}</div>${thread}
+      ${showCmp ? `<div class="cmp"><figure><div class="img" data-img="${it.id}:before" ${imgStyle(it, 'before')}></div><figcaption>Before</figcaption></figure><figure><div class="img" data-img="${it.id}:after" ${imgStyle(it, 'after')}></div><figcaption>After</figcaption></figure></div>` : ''}
       ${canReply ? `<div class="reply"><input class="replyInput" type="text" data-id="${it.id}" value="${esc(replyDrafts[it.id] || '')}" placeholder="${it.status === 'question' ? 'Answer Claude…' : 'Not quite right? Say why…'}"></div>` : ''}
-      <div style="margin-top:6px"><button class="link" data-del="${it.id}">Delete</button></div>
+      <div class="acts">${canUndo ? `<button class="btn ghost small" data-undo="${it.id}">Undo change</button>` : ''}<button class="link" data-del="${it.id}">Delete</button></div>
     </div>`;
   }).join('');
+  loadImages();
+}
+
+async function loadImages() {
+  for (const it of items) {
+    if (!(it.status === 'done' && it.hasBefore && it.hasAfter)) continue;
+    for (const kind of ['before', 'after']) {
+      const key = `${it.id}:${kind}:${it.updatedAt}`;
+      if (imgCache.has(key)) continue;
+      try {
+        const r = await fetch(`${BRIDGE}/annotations/${it.id}/image/${kind}`);
+        if (!r.ok) continue;
+        const url = URL.createObjectURL(await r.blob());
+        imgCache.set(key, url);
+        const el = document.querySelector(`[data-img="${it.id}:${kind}"]`);
+        if (el) el.style.backgroundImage = `url(${url})`;
+      } catch {}
+    }
+  }
+}
+
+// ----- undo -----
+function onPatchResult(m) {
+  const r = m.result;
+  const problems = r.missing.length + r.errors.length;
+  fetch(`${BRIDGE}/annotations/${m.id}/reverted`, { method: 'POST' }).then(() => refresh(true));
+  post({ type: 'notify', text: problems ? `Reverted with ${problems} problem(s): layers missing or locked` : 'Change reverted' });
 }
 
 $('list').addEventListener('click', async e => {
+  const undo = e.target.closest('[data-undo]');
+  if (undo) {
+    const it = items.find(i => i.id === undo.dataset.undo);
+    if (it && it.patch) post({ type: 'apply-patch', id: it.id, patch: it.patch });
+    return;
+  }
   const del = e.target.closest('[data-del]');
   if (del) {
+    const it = items.find(i => i.id === del.dataset.del);
+    if (it) post({ type: 'clear-markers', id: it.id, nodeIds: it.nodes.map(n => n.id) });
     await fetch(`${BRIDGE}/annotations/${del.dataset.del}`, { method: 'DELETE' });
-    return refresh();
+    return refresh(true);
   }
   if (e.target.classList.contains('replyInput')) return;
   const item = e.target.closest('.item');
@@ -236,12 +377,12 @@ $('list').addEventListener('keydown', async e => {
   });
   delete replyDrafts[id];
   e.target.blur();
-  refresh();
+  refresh(true);
 });
 
 post({ type: 'ready' });
-refresh();
-setInterval(refresh, 2000);
+refresh(true);
+setInterval(() => refresh(false), 2000);
 </script>
 </body>
 </html>

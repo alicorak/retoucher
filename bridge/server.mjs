@@ -27,7 +27,12 @@ const now = () => new Date().toISOString();
 
 function publicItem(it) {
   const { imageFile, ...rest } = it;
-  return { ...rest, imagePath: imageFile ? path.join(IMAGES, imageFile) : null };
+  return {
+    ...rest,
+    imagePath: imageFile ? path.join(IMAGES, imageFile) : null,
+    hasBefore: fs.existsSync(path.join(IMAGES, `${it.id}-before.png`)),
+    hasAfter: fs.existsSync(path.join(IMAGES, `${it.id}-after.png`)),
+  };
 }
 
 function figmaUrl(it) {
@@ -106,11 +111,22 @@ const server = http.createServer(async (req, res) => {
         intent: b.intent || 'change',
         priority: b.priority || 'normal',
         imageFile,
+        batchId: b.batchId || null,
         thread: [],
       };
       db.items.push(it);
       save();
       return send(res, 201, publicItem(it));
+    }
+
+    // serve stored images to the plugin: /annotations/:id/image/(selection|before|after)
+    if (req.method === 'GET' && parts[0] === 'annotations' && parts[2] === 'image' && parts.length === 4) {
+      const kind = parts[3];
+      const file = kind === 'selection' ? `${parts[1]}.png` : (kind === 'before' || kind === 'after') ? `${parts[1]}-${kind}.png` : null;
+      const full = file && path.join(IMAGES, file);
+      if (!full || !fs.existsSync(full)) return send(res, 404, { error: 'no image' });
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+      return res.end(fs.readFileSync(full));
     }
 
     // single item
@@ -139,6 +155,36 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, publicItem(it));
       }
 
+      // before/after screenshots saved by Claude
+      if (req.method === 'POST' && parts[2] === 'snapshot') {
+        const b = await readBody(req);
+        if (!['before', 'after'].includes(b.kind) || !b.image) return send(res, 400, { error: 'kind (before|after) and image required' });
+        fs.writeFileSync(path.join(IMAGES, `${it.id}-${b.kind}.png`), Buffer.from(b.image, 'base64'));
+        it.updatedAt = now();
+        save();
+        return send(res, 200, publicItem(it));
+      }
+
+      // revert patch recorded by Claude before it edits: { set: [{id, props}], remove: [ids] }
+      if (req.method === 'POST' && parts[2] === 'patch') {
+        const b = await readBody(req);
+        if (!b.patch || (!Array.isArray(b.patch.set) && !Array.isArray(b.patch.remove))) return send(res, 400, { error: 'patch.set and/or patch.remove required' });
+        it.patch = { set: b.patch.set || [], remove: b.patch.remove || [] };
+        it.reverted = false;
+        it.updatedAt = now();
+        save();
+        return send(res, 200, publicItem(it));
+      }
+
+      // plugin reports an undo
+      if (req.method === 'POST' && parts[2] === 'reverted') {
+        it.reverted = true;
+        it.thread.push({ from: 'system', text: 'Change reverted from the plugin.', at: now() });
+        it.updatedAt = now();
+        save();
+        return send(res, 200, publicItem(it));
+      }
+
       if (req.method === 'PATCH' && parts.length === 2) {
         const b = await readBody(req);
         if (b.status) {
@@ -153,6 +199,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'DELETE' && parts.length === 2) {
         db.items = db.items.filter(i => i !== it);
         if (it.imageFile) fs.rmSync(path.join(IMAGES, it.imageFile), { force: true });
+        for (const k of ['before', 'after']) fs.rmSync(path.join(IMAGES, `${it.id}-${k}.png`), { force: true });
         save();
         return send(res, 200, { ok: true });
       }
