@@ -59,6 +59,9 @@ Claude then processes every note you send. The session must stay open; if it is 
 
 - **Batch:** *Add to batch* (⇧⌘↵) collects several notes, *Send all* delivers them together. Claude handles them in order.
 - **Canvas markers:** each open note adds a native Figma annotation ("Claude #3 · Waiting") on its layers. It updates with the status and disappears when the note is done or deleted. Toggle with *Show markers on canvas*. Other people's annotations are never touched.
+- **Several targets:** *Add selection* collects layers and frames, on any page, into the note. Each keeps its own screenshot. Nothing added: the current selection is used.
+- **Areas:** *Select area* drops a box on the canvas. Drag and resize it over any part, then *Add area*. Claude gets the position, the screen it sits in and the layer underneath, like a pinned Figma comment.
+- **Files:** add up to 8 files per note (12 MB each): photos, PDFs, text, anything. Drop them anywhere on the panel, paste (screenshots included), or use *Add file*. Photos are scaled to 1600 px.
 - **Before / after + Undo:** finished notes show a before and after picture. *Undo change* restores the old values Claude recorded before editing (works without Claude being online). Changes Claude couldn't record show no Undo button.
 
 ## Using it

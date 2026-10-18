@@ -8,6 +8,7 @@
 //   fa say <id> "message"       reply without changing status
 //   fa snapshot <id> before|after <png>   store a before/after screenshot (shown in the plugin)
 //   fa patch <id> <json-file>   store the revert patch so the plugin can Undo (see CLAUDE.md)
+//   fa focus <id> <json-file>   layers to select in Figma (JSON array of node ids); the plugin shows a Select button
 //   fa watch                    print one line per new/updated pending item (for Monitor)
 import fs from 'node:fs';
 const BASE = `http://localhost:${process.env.FA_PORT || 4747}`;
@@ -24,8 +25,8 @@ async function api(path, opts = {}) {
 }
 
 const oneLine = s => String(s).replace(/\s+/g, ' ').slice(0, 140);
-const batchLabel = it => (it.batchId ? ` [batch ${it.batchId}]` : '');
-const nodesLabel = it => it.nodes.map(n => `${n.name} (${n.id})`).join(', ') || 'no selection';
+const batchLabel = it => (it.batchId ? ` [batch ${it.batchId}]` : '') + (it.attachments?.length ? ` [+${it.attachments.length} file${it.attachments.length > 1 ? 's' : ''}]` : '');
+const nodesLabel = it => it.nodes.map(n => n.region ? `area ${n.w}×${n.h} in "${n.region.frameName || 'page'}"` : `${n.name} (${n.id})`).join(', ') || 'no selection';
 
 async function main() {
   const [cmd, a, ...rest] = process.argv.slice(2);
@@ -52,6 +53,14 @@ async function main() {
       if (!file) throw new Error('usage: fa patch <id> <json-file>');
       await api(`/annotations/${a}/patch`, { method: 'POST', body: { patch: JSON.parse(fs.readFileSync(file, 'utf8')) } });
       return console.log(`#${a} revert patch saved`);
+    }
+    case 'focus': {
+      const file = rest[0];
+      if (!file) throw new Error('usage: fa focus <id> <json-file>');
+      const j = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const ids = Array.isArray(j) ? j : j.ids;
+      await api(`/annotations/${a}`, { method: 'PATCH', body: { focus: ids } });
+      return console.log(`#${a} focus ${ids.length} layers`);
     }
     case 'claim':
       await api(`/annotations/${a}`, { method: 'PATCH', body: { status: 'working' } });
@@ -87,7 +96,7 @@ async function main() {
       }
     }
     default:
-      console.log('usage: fa list|show|claim|snapshot|patch|done|ask|say|watch');
+      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|watch');
   }
 }
 

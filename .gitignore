@@ -3,3 +3,10 @@ data/*
 !data/.gitkeep
 node_modules/
 .DS_Store
+
+# Local research output
+research_notes/
+reports/
+
+# Local experiments on private projects (design-vs-build drift trials)
+drift/
