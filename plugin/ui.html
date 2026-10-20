@@ -2,174 +2,299 @@
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
+  /* Figma's theme colours when the plugin runs in Figma; plain light values everywhere else */
+  :root {
+    --bg: var(--figma-color-bg, #fff);
+    --bg2: var(--figma-color-bg-secondary, #f5f5f5);
+    --bg3: var(--figma-color-bg-tertiary, #e6e6e6);
+    --hover: var(--figma-color-bg-hover, #f0f0f0);
+    --text: var(--figma-color-text, #1e1e1e);
+    --text2: var(--figma-color-text-secondary, #757575);
+    --text3: var(--figma-color-text-tertiary, #b3b3b3);
+    --line: var(--figma-color-border, #e6e6e6);
+    --focus: var(--figma-color-border-selected, #0d99ff);
+    --brand: var(--figma-color-bg-brand, #0d99ff);
+    --on-brand: var(--figma-color-text-onbrand, #fff);
+    --brand-soft: var(--figma-color-bg-brand-tertiary, #e5f4ff);
+    --brand-text: var(--figma-color-text-brand, #007be5);
+    --ok: var(--figma-color-text-success, #14ae5c);
+    --warn: var(--figma-color-text-warning, #b86200);
+    --warn-soft: var(--figma-color-bg-warning-tertiary, #fff1e3);
+    --bad: var(--figma-color-icon-danger, #f24822);
+    --inverse: var(--figma-color-bg-inverse, #2c2c2c);
+    --on-inverse: var(--figma-color-text-oninverse, #fff);
+    --mark: #f24822;
+    --r: 6px;
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 12px/1.45 Inter, system-ui, sans-serif; color: var(--figma-color-text); background: var(--figma-color-bg); display: flex; flex-direction: column; height: 100vh; }
-  .muted { color: var(--figma-color-text-secondary); }
-  header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid var(--figma-color-border); }
-  header b { font-weight: 600; }
-  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: var(--figma-color-icon-danger); }
-  .dot.on { background: var(--figma-color-icon-success); }
-  .composer { padding: 12px; border-bottom: 1px solid var(--figma-color-border); display: flex; flex-direction: column; gap: 8px; }
-  .target { display: flex; gap: 8px; align-items: center; min-height: 44px; }
-  .thumb { width: 44px; height: 44px; border-radius: 4px; border: 1px solid var(--figma-color-border); background: var(--figma-color-bg-secondary) center/contain no-repeat; flex: none; }
-  .target .name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  textarea, input[type=text] { width: 100%; font: inherit; color: inherit; background: var(--figma-color-bg-secondary); border: 1px solid transparent; border-radius: 5px; padding: 8px; resize: none; outline: none; }
-  textarea:focus, input[type=text]:focus { border-color: var(--figma-color-border-selected); }
-  .row { display: flex; gap: 6px; align-items: center; }
-  .seg { display: flex; background: var(--figma-color-bg-secondary); border-radius: 5px; padding: 2px; flex: 1; }
-  .seg button { flex: 1; border: 0; background: transparent; color: var(--figma-color-text-secondary); font: inherit; padding: 4px 0; border-radius: 4px; cursor: pointer; }
-  .seg button.on { background: var(--figma-color-bg); color: var(--figma-color-text); box-shadow: 0 0 0 1px var(--figma-color-border); }
-  .btn { border: 0; border-radius: 6px; font: inherit; font-weight: 500; padding: 8px 12px; cursor: pointer; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body { font: 12px/1.45 Inter, system-ui, -apple-system, sans-serif; color: var(--text); background: var(--bg); display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+  .muted { color: var(--text2); }
+  svg { display: block; flex: none; }
+
+  /* buttons */
+  .ib { width: 28px; height: 28px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: var(--r); background: none; color: var(--text2); cursor: pointer; position: relative; }
+  .ib:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+  .ib:disabled { opacity: .35; cursor: default; }
+  .ib.on { background: var(--brand-soft); color: var(--brand-text); }
+  .ib .badge { position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 2px var(--bg); }
+  .btn { height: 28px; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: var(--r); padding: 0 10px; font-weight: 500; white-space: nowrap; cursor: pointer; }
   .btn:disabled { opacity: .4; cursor: default; }
-  .btn.primary { background: var(--figma-color-bg-brand); color: var(--figma-color-text-onbrand); flex: 1; }
-  .btn.ghost { background: var(--figma-color-bg-secondary); color: var(--figma-color-text); }
-  .btn.small { padding: 4px 10px; font-weight: 400; }
+  .btn.primary { background: var(--brand); color: var(--on-brand); }
+  .btn.ghost { background: var(--bg2); }
+  .btn.ghost:hover:not(:disabled) { background: var(--bg3); }
+  .btn.sm { height: 24px; padding: 0 8px; font-weight: 400; }
+  .link { border: 0; background: none; padding: 0; color: var(--text2); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 
-  /* targets: layers, frames and areas the note is about */
-  .chips { display: flex; flex-direction: column; gap: 4px; }
-  .tchip { display: flex; align-items: center; gap: 8px; padding: 3px 4px 3px 3px; border-radius: 6px; background: var(--figma-color-bg-secondary); }
-  .tchip .tt { width: 28px; height: 28px; border-radius: 4px; border: 1px solid var(--figma-color-border); background: var(--figma-color-bg) center/contain no-repeat; flex: none; }
-  .tchip .tn { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tchip .rm, .athumb .rm, .fchip .rm { border: 0; background: none; color: var(--figma-color-text-secondary); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px; }
+  /* header */
+  .bar { height: 40px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px 0 12px; border-bottom: 1px solid var(--line); }
+  .bar b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status { height: 24px; min-width: 104px; flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 0; border-radius: 12px; background: none; color: var(--text2); cursor: pointer; white-space: nowrap; }
+  .status:hover { background: var(--hover); }
+  .dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--bad); }
+  .dot.on { background: var(--ok); }
+  .dot.wait { background: var(--warn); }
 
-  /* files */
-  .attach { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-  .athumb { position: relative; width: 44px; height: 44px; border-radius: 4px; border: 1px solid var(--figma-color-border); background: var(--figma-color-bg-secondary) center/cover no-repeat; }
-  .athumb .rm { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; padding: 0; border-radius: 50%; background: var(--figma-color-bg-inverse); color: var(--figma-color-text-oninverse); font-size: 10px; line-height: 16px; }
-  .fchip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 4px 3px 6px; border-radius: 6px; background: var(--figma-color-bg-secondary); }
-  .fchip .ext { font-size: 9px; font-weight: 600; letter-spacing: .04em; padding: 1px 4px; border-radius: 3px; background: var(--figma-color-bg-tertiary); }
-  .fchip .fn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
-  #drop { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; pointer-events: none; background: color-mix(in srgb, var(--figma-color-bg, #fff) 82%, transparent); border: 2px dashed var(--figma-color-border-brand); font-weight: 500; color: var(--figma-color-text-brand); }
+  /* banners: connection help, missing file key */
+  .banner { flex: none; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--bg2); display: flex; flex-direction: column; gap: 6px; }
+  .banner.warn { background: var(--warn-soft); }
+  .banner .head { display: flex; gap: 8px; align-items: flex-start; }
+  .banner .head > div { flex: 1; min-width: 0; }
+  .cmd { display: flex; gap: 6px; align-items: center; }
+  .cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font: 11px/1.4 ui-monospace, Menlo, monospace; padding: 5px 7px; border-radius: 4px; background: var(--bg); border: 1px solid var(--line); scrollbar-width: none; }
+  input[type=text], select, textarea { font: inherit; color: inherit; outline: none; }
+  input[type=text] { width: 100%; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
+  input[type=text]:focus { border-color: var(--focus); }
+
+  /* the notes */
+  .list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; overscroll-behavior: contain; padding: 4px 0 8px; }
+  .list::-webkit-scrollbar { width: 8px; }
+  .list::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 4px; border: 2px solid var(--bg); }
+  .empty { padding: 32px 20px; color: var(--text2); }
+  .empty b { display: block; color: var(--text); font-weight: 600; margin-bottom: 8px; }
+  .empty ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+  .item { padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .item:hover { background: var(--hover); }
+  .item.hit { box-shadow: inset 2px 0 0 var(--brand); background: var(--brand-soft); }
+  .item .top { display: flex; align-items: center; gap: 8px; min-width: 0; height: 20px; }
+  .item .who { flex: 1; min-width: 0; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .st { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 10px; font-size: 11px; white-space: nowrap; background: var(--bg2); color: var(--text2); }
+  .st::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .st.working { color: var(--brand-text); background: var(--brand-soft); }
+  .st.working::before { animation: pulse 1.4s ease-in-out infinite; }
+  .st.question { color: var(--warn); background: var(--warn-soft); }
+  .st.done { color: var(--ok); }
+  .st.reverted { color: var(--text3); }
+  @keyframes pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .st.working::before { animation: none; } }
+  .you, .msg { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .you { font-size: 12px; }
+  .meta { font-size: 11px; color: var(--text2); overflow-wrap: anywhere; }
+  .msg { padding: 6px 8px; border-radius: var(--r); background: var(--bg2); }
+  .msg.claude { background: var(--brand-soft); }
+  .msg.system { padding: 0; background: none; color: var(--text2); font-style: italic; }
+  .msg small { display: block; font-size: 10px; color: var(--text2); margin-bottom: 1px; }
+  .media { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; min-width: 0; }
+  .ph { width: 48px; height: 48px; flex: none; border-radius: 4px; border: 1px solid var(--line); background: var(--bg2) center/cover no-repeat; }
+  .ph.sm { width: 36px; height: 36px; background-size: contain; }
+  .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .cmp figure { margin: 0; min-width: 0; }
+  .cmp .img { height: 80px; border-radius: 4px; border: 1px solid var(--line); background: var(--bg2) center/contain no-repeat; }
+  .cmp figcaption { font-size: 10px; color: var(--text2); margin-top: 2px; }
+  .acts { display: flex; align-items: center; gap: 4px; min-height: 24px; flex-wrap: wrap; }
+  .acts .grow { flex: 1; }
+  .acts .ib { width: 24px; height: 24px; }
+  .reply input { height: 28px; }
+
+  /* files and targets */
+  .fchip { height: 24px; max-width: 100%; display: inline-flex; align-items: center; gap: 6px; padding: 0 4px 0 6px; border-radius: var(--r); background: var(--bg2); min-width: 0; }
+  .fchip .ext { flex: none; font-size: 9px; font-weight: 600; letter-spacing: .04em; padding: 1px 4px; border-radius: 3px; background: var(--bg3); }
+  .fchip .fn { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fchip .muted { flex: none; }
+  .x { width: 18px; height: 18px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 0; padding: 0; border-radius: 4px; background: none; color: var(--text2); cursor: pointer; }
+  .x:hover { background: var(--bg3); color: var(--text); }
+  .athumb { position: relative; width: 44px; height: 44px; flex: none; border-radius: 4px; border: 1px solid var(--line); background: var(--bg2) center/cover no-repeat; }
+  .athumb .x { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 50%; background: var(--inverse); color: var(--on-inverse); }
+
+  /* the composer */
+  .composer { flex: none; position: relative; padding: 8px 12px 12px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+  .ctx { display: flex; align-items: center; gap: 8px; height: 32px; min-width: 0; }
+  .thumb { width: 32px; height: 32px; flex: none; border-radius: 4px; border: 1px solid var(--line); background: var(--bg2) center/contain no-repeat; }
+  .ctx .txt { flex: 1; min-width: 0; line-height: 15px; }
+  .ctx .name, .ctx .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ctx .name { font-weight: 500; }
+  .ctx .sub { font-size: 11px; color: var(--text2); }
+  .strip { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+  .strip::-webkit-scrollbar { display: none; }
+  #targets { flex-wrap: wrap; overflow: visible; max-height: 96px; overflow-y: auto; }
+  .tchip { height: 28px; max-width: 100%; flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 6px; padding: 0 2px 0 2px; border-radius: var(--r); background: var(--bg2); }
+  .tchip .tt { width: 24px; height: 24px; flex: none; border-radius: 4px; background: var(--bg) center/contain no-repeat; }
+  .tchip .tn { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .field { position: relative; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); display: flex; flex-direction: column; min-width: 0; }
+  .field:focus-within { border-color: var(--focus); }
+  .field textarea { display: block; width: 100%; border: 0; background: none; resize: none; padding: 8px 10px 4px; min-height: 44px; max-height: 160px; field-sizing: content; overflow-y: auto; }
+  .field .files { padding: 4px 8px; flex-wrap: wrap; overflow: visible; }
+  .field .optline { padding: 0 10px; font-size: 11px; color: var(--brand-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tools { display: flex; align-items: center; gap: 2px; padding: 4px; min-width: 0; }
+  .tools .grow { flex: 1; min-width: 4px; }
+  .tools .btn { margin-left: 4px; }
+
+  /* popovers over the notes: they never push the layout */
+  .pop { position: absolute; left: 12px; right: 12px; bottom: calc(100% + 6px); z-index: 40; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, .14); }
+  #mention { left: 0; right: 0; bottom: calc(100% + 4px); max-height: 220px; overflow-y: auto; padding: 4px; }
+  #mention .opt { display: flex; gap: 6px; align-items: baseline; padding: 5px 8px; border-radius: 4px; cursor: pointer; min-width: 0; }
+  #mention .opt.on { background: var(--hover); }
+  #mention .opt b { flex: 1; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #mention .opt span { flex: none; max-width: 50%; font-size: 10px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #mention .none { padding: 6px 8px; color: var(--text2); }
+  .opts { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .orow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .orow .lbl { width: 72px; flex: none; color: var(--text2); }
+  .seg { flex: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--r); background: var(--bg2); min-width: 0; }
+  .seg button { flex: 1; height: 22px; border: 0; border-radius: 4px; background: none; color: var(--text2); cursor: pointer; }
+  .seg button.on { background: var(--bg); color: var(--text); box-shadow: 0 0 0 1px var(--line); }
+  select { flex: 1; min-width: 0; height: 26px; padding: 0 6px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); }
+  label.tog { display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 0; }
+  label.tog input { margin: 0; flex: none; }
+
+  /* batch */
+  .batch { flex: none; max-height: 140px; overflow-y: auto; padding: 8px 12px; border-top: 1px solid var(--line); background: var(--brand-soft); display: flex; flex-direction: column; gap: 4px; }
+  .batch .head { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+  .batch .head span { flex: 1; }
+  .draft { display: flex; gap: 6px; align-items: center; min-width: 0; height: 20px; }
+  .draft .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .batch .actions { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+
+  /* drop overlay */
+  #drop { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; pointer-events: none; background: color-mix(in srgb, var(--bg) 86%, transparent); border: 2px dashed var(--brand); border-radius: 8px; font-weight: 500; color: var(--brand-text); }
   body.dragging #drop { display: flex; }
 
-  /* area picker: a picture of the frame to mark up, like leaving comments */
-  #picker { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--figma-color-bg, #fff); color: var(--figma-color-text, #111); }
-  #picker[hidden] { display: none; }
-  .pk-bar { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--figma-color-border); flex-wrap: wrap; }
-  .pk-bar .grow { flex: 1; min-width: 8px; }
-  .pk-wrap { flex: 1; overflow: auto; padding: 12px; background: var(--figma-color-bg-secondary, #f0f0f0); }
-  .pk-stage { position: relative; line-height: 0; margin: 0 auto; box-shadow: 0 0 0 1px var(--figma-color-border); background: #fff; }
+  /* area picker */
+  #picker { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: var(--bg); }
+  .pk-bar { height: 44px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 8px 0 12px; border-bottom: 1px solid var(--line); min-width: 0; }
+  .pk-bar b { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pk-bar .hint { flex: 1 1 0; min-width: 0; margin-left: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pk-bar .sep { width: 1px; height: 16px; background: var(--line); margin: 0 4px; flex: none; }
+  .pk-wrap { flex: 1; min-height: 0; overflow: auto; padding: 12px; background: var(--bg2); }
+  .pk-stage { position: relative; line-height: 0; margin: 0 auto; box-shadow: 0 0 0 1px var(--line), 0 2px 12px rgba(0, 0, 0, .08); background: #fff; }
   .pk-stage img { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
   .pk-layer { position: absolute; inset: 0; cursor: crosshair; touch-action: none; }
-  .pk-box { position: absolute; border: 2px solid #f24822; background: rgba(242, 72, 34, .14); border-radius: 3px; pointer-events: none; }
-  .pk-box i { position: absolute; top: -11px; left: -11px; width: 22px; height: 22px; border-radius: 50%; background: #f24822; color: #fff; font: 600 11px/22px Inter, system-ui, sans-serif; text-align: center; font-style: normal; }
+  .pk-box { position: absolute; border: 2px solid var(--mark); background: rgba(242, 72, 34, .12); border-radius: 3px; pointer-events: none; }
+  .pk-box i { position: absolute; top: -11px; left: -11px; width: 22px; height: 22px; border-radius: 50%; background: var(--mark); color: #fff; font: 600 11px/22px Inter, system-ui, sans-serif; text-align: center; font-style: normal; box-shadow: 0 0 0 2px #fff; }
   .pk-box.live { border-style: dashed; }
 
-  .batch { padding: 8px 12px; border-bottom: 1px solid var(--figma-color-border); background: var(--figma-color-bg-brand-tertiary); display: none; }
-  .batch.show { display: block; }
-  .batch .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-weight: 500; }
-  .draft { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
-  .draft span.t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .batch .actions { display: flex; gap: 6px; margin-top: 6px; }
-
-  .list { flex: 1; overflow-y: auto; padding: 0 0 12px; }
-  .empty { padding: 24px 12px; text-align: center; }
-  .item { padding: 10px 12px; border-bottom: 1px solid var(--figma-color-border); cursor: pointer; }
-  .item:hover { background: var(--figma-color-bg-hover); }
-  .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 6px; }
-  .top > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chip { font-size: 10px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--figma-color-border); white-space: nowrap; }
-  .chip.pending { color: var(--figma-color-text-secondary); }
-  .chip.working { color: var(--figma-color-text-brand); border-color: var(--figma-color-border-brand); }
-  .chip.question { color: var(--figma-color-text-warning); border-color: var(--figma-color-border-warning); }
-  .chip.done { color: var(--figma-color-text-success); border-color: var(--figma-color-border-success); }
-  .chip.reverted { color: var(--figma-color-text-secondary); }
-  .msg { margin-top: 6px; padding: 6px 8px; border-radius: 5px; background: var(--figma-color-bg-secondary); white-space: pre-wrap; }
-  .msg.claude { background: var(--figma-color-bg-brand-tertiary); }
-  .msg.system { background: none; padding: 0; font-style: italic; color: var(--figma-color-text-secondary); }
-  .msg small { display: block; font-size: 10px; margin-bottom: 2px; color: var(--figma-color-text-secondary); }
-  .reply { margin-top: 6px; }
-  .link { background: none; border: 0; color: var(--figma-color-text-secondary); font: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
-  .acts { margin-top: 8px; display: flex; gap: 10px; align-items: center; }
-  .cmp { display: flex; gap: 6px; margin-top: 8px; }
-  .cmp figure { margin: 0; flex: 1; min-width: 0; }
-  .cmp .img { height: 84px; border: 1px solid var(--figma-color-border); border-radius: 4px; background: var(--figma-color-bg-secondary) center/contain no-repeat; }
-  .cmp figcaption { font-size: 10px; margin-top: 2px; color: var(--figma-color-text-secondary); }
-  .photos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
-  .photos .ph { width: 56px; height: 56px; border-radius: 4px; border: 1px solid var(--figma-color-border); background: var(--figma-color-bg-secondary) center/cover no-repeat; }
-  .photos .ph.sm { width: 40px; height: 40px; background-size: contain; }
-  .setup { padding: 10px 12px; border-bottom: 1px solid var(--figma-color-border); background: var(--figma-color-bg-warning-tertiary); display: none; }
-  .setup.show { display: block; }
-  .setup input { margin-top: 6px; }
-  label.tog { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  /* resize grip */
+  #grip { position: fixed; right: 0; bottom: 0; width: 14px; height: 14px; z-index: 70; cursor: nwse-resize; color: var(--text3); }
+  #grip svg { position: absolute; right: 2px; bottom: 2px; }
 </style>
 </head>
 <body>
 <div id="drop">Drop files to attach</div>
+
 <div id="picker" hidden>
   <div class="pk-bar">
     <b id="pkTitle">Mark areas</b>
-    <span class="muted" id="pkHint">Drag to mark an area, click to drop a pin.</span>
-    <span class="grow"></span>
-    <button class="btn ghost small" id="pkOut" type="button" title="Zoom out">−</button>
-    <button class="btn ghost small" id="pkIn" type="button" title="Zoom in">+</button>
-    <button class="btn ghost small" id="pkUndo" type="button">Undo</button>
-    <button class="btn ghost small" id="pkCancel" type="button">Cancel</button>
-    <button class="btn primary small" id="pkAdd" type="button" disabled>Add</button>
+    <span class="hint muted" id="pkHint">Drag for an area, click for a pin</span>
+    <button class="ib" id="pkOut" type="button" title="Zoom out"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M4 8h8"/></svg></button>
+    <button class="ib" id="pkIn" type="button" title="Zoom in"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 4v8M4 8h8"/></svg></button>
+    <button class="ib" id="pkUndo" type="button" title="Undo (Backspace)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4 3 6.5 5.5 9"/><path d="M3 6.5h6.25a3.25 3.25 0 0 1 0 6.5H7"/></svg></button>
+    <span class="sep"></span>
+    <button class="btn ghost sm" id="pkCancel" type="button">Cancel</button>
+    <button class="btn primary sm" id="pkAdd" type="button" disabled>Add</button>
   </div>
   <div class="pk-wrap" id="pkWrap"><div class="pk-stage" id="pkStage"><img id="pkImg" alt=""><div class="pk-layer" id="pkLayer"></div></div></div>
 </div>
-<header>
+
+<header class="bar">
   <b>Annotate for Claude</b>
-  <span class="muted"><span class="dot" id="dot"></span><span id="connText">connecting</span></span>
+  <button class="status" id="conn" type="button" title="Connection"><span class="dot" id="dot"></span><span id="connText">Connecting…</span></button>
 </header>
 
-<div class="setup" id="setup">
-  Figma didn't share this file's key. Paste the file's URL once so Claude knows which file to open.
+<!-- what is missing and how to fix it, shown until Claude is ready -->
+<div class="banner" id="help" hidden>
+  <div class="head"><div id="helpText"></div><button class="x" id="helpClose" type="button" title="Hide"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+  <div class="cmd" id="helpCmdRow"><code id="helpCmd"></code><button class="btn ghost sm" id="helpCopy" type="button">Copy</button></div>
+  <div class="muted" id="helpNote"></div>
+</div>
+
+<div class="banner warn" id="setup" hidden>
+  <div>Figma didn't share this file's key. Paste the file's URL once so Claude knows which file to open.</div>
   <input type="text" id="fileUrl" placeholder="https://www.figma.com/design/…">
 </div>
 
-<div class="composer">
-  <div class="target">
-    <div class="thumb" id="thumb"></div>
-    <div style="min-width:0; flex:1">
-      <div class="name" id="tName">Nothing selected</div>
-      <div class="muted" id="tMeta">Select layers or frames, or an area.</div>
-    </div>
-    <button class="btn ghost small" id="addSel" type="button" disabled>Add selection</button>
-  </div>
-  <div class="chips" id="targets"></div>
-  <div class="row">
-    <button class="btn ghost small" id="makeArea" type="button" title="Opens a big picture of the selected frame (or of what is on screen) to mark areas on, like comments">Mark area</button>
-    <span class="muted" id="targetHint">Select a frame, then Mark area. Nothing selected: what is on screen.</span>
-  </div>
-  <textarea id="note" rows="3" placeholder="What should change? (⌘↵ to send)"></textarea>
-  <div class="attach" id="attach">
-    <button class="btn ghost small" id="addFile" type="button">Add file</button>
-    <input type="file" id="fileInput" multiple hidden>
-    <span class="muted" id="fileHint">Drop, paste or add photos and files.</span>
-  </div>
-  <div class="row">
-    <div class="seg" id="intent">
-      <button data-v="change" class="on">Change</button>
-      <button data-v="fix">Fix</button>
-      <button data-v="add">Add</button>
-      <button data-v="question">Ask</button>
-    </div>
-    <div class="seg" id="priority" style="flex:.6">
-      <button data-v="normal" class="on">Normal</button>
-      <button data-v="urgent">Urgent</button>
-    </div>
-  </div>
-  <div class="row">
-    <button class="btn primary" id="send" disabled>Send to Claude</button>
-    <button class="btn ghost" id="queue" disabled title="Collect several notes, then send them together">Add to batch</button>
-  </div>
-  <label class="tog muted"><input type="checkbox" id="markers" checked> Show markers on canvas</label>
-</div>
+<main class="list" id="list"></main>
 
-<div class="batch" id="batch">
-  <div class="head"><span id="batchTitle"></span><button class="link" id="batchClear">Clear</button></div>
+<div class="batch" id="batch" hidden>
+  <div class="head"><span id="batchTitle"></span><button class="link" id="batchClear" type="button">Clear</button></div>
   <div id="drafts"></div>
-  <div class="actions"><button class="btn primary small" id="batchSend">Send all</button></div>
+  <div class="actions">
+    <button class="btn primary sm" id="batchSend" type="button">Send all</button>
+    <label class="tog muted" title="Notes that don't depend on each other are worked on at the same time"><input type="checkbox" id="parallel"> At the same time</label>
+  </div>
 </div>
 
-<div class="list" id="list"><div class="empty muted">No notes yet.</div></div>
+<footer class="composer" id="composer">
+  <div class="pop opts" id="opts" hidden>
+    <div class="orow">
+      <span class="lbl" title="Claude makes this many different directions side by side and leaves the original as it is">Versions</span>
+      <div class="seg" id="variations"><button data-v="1" class="on" type="button">1</button><button data-v="2" type="button">2</button><button data-v="3" type="button">3</button><button data-v="4" type="button">4</button></div>
+    </div>
+    <div class="orow">
+      <span class="lbl">Build with</span>
+      <select id="library" title="Which design system Claude builds with"><option value="">Any library</option><option value="local">This file only</option></select>
+    </div>
+    <label class="tog" title="Claude reads the Figma comments on these layers (needs a Figma token on the bridge)"><input type="checkbox" id="useComments"> Use Figma comments</label>
+    <label class="tog"><input type="checkbox" id="urgent"> Urgent</label>
+    <label class="tog"><input type="checkbox" id="markers" checked> Show markers on canvas</label>
+  </div>
+
+  <div class="ctx">
+    <div class="thumb" id="thumb"></div>
+    <div class="txt">
+      <div class="name" id="tName">Nothing selected</div>
+      <div class="sub" id="tMeta">Select layers or frames, or an area.</div>
+    </div>
+    <button class="ib" id="addSel" type="button" disabled title="Add this selection to the note, then select something else too"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M8 3.5v9M3.5 8h9"/></svg></button>
+    <button class="ib" id="makeArea" type="button" title="Mark areas on a picture of the selected frame (or of what is on screen), like comments"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 5V3.5a1 1 0 0 1 1-1H5M11 2.5h1.5a1 1 0 0 1 1 1V5M13.5 11v1.5a1 1 0 0 1-1 1H11M5 13.5H3.5a1 1 0 0 1-1-1V11"/><path d="M8 6v4M6 8h4"/></svg></button>
+  </div>
+
+  <div class="strip" id="targets" hidden></div>
+
+  <div class="field">
+    <div class="pop" id="mention" hidden></div>
+    <textarea id="note" rows="2" placeholder="What should change? Type @ for variables, styles, components"></textarea>
+    <div class="strip files" id="files" hidden></div>
+    <div class="optline" id="optLine" hidden></div>
+    <div class="tools">
+      <button class="ib" id="addFile" type="button" title="Attach photos, PDFs, anything. You can also drop or paste them."><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7.5 8.2 12.3a3 3 0 0 1-4.3-4.3L9 2.9a2 2 0 0 1 2.9 2.9L6.8 10.9a1 1 0 0 1-1.5-1.5L10 4.8"/></svg></button>
+      <button class="ib" id="atBtn" type="button" title="Mention a variable, style or component"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="8" cy="8" r="2.4"/><path d="M10.4 8v.9a1.7 1.7 0 0 0 3.4 0V8a5.8 5.8 0 1 0-2.3 4.6"/></svg></button>
+      <button class="ib" id="optsBtn" type="button" aria-expanded="false" title="Options"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M2.5 5h6M12.5 5h1M2.5 11h1M7.5 11h6"/><circle cx="10.5" cy="5" r="1.6"/><circle cx="5.5" cy="11" r="1.6"/></svg><span class="badge" id="optsBadge" hidden></span></button>
+      <span class="grow"></span>
+      <span class="muted" id="fileHint"></span>
+      <button class="btn ghost" id="queue" type="button" disabled title="Collect several notes, then send them together (⇧⌘↵)">Batch</button>
+      <button class="btn primary" id="send" type="button" disabled title="Send (⌘↵)">Send</button>
+    </div>
+    <input type="file" id="fileInput" multiple hidden>
+  </div>
+</footer>
+
+<div id="grip" title="Drag to resize"><svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M7 1 1 7M7 4.5 4.5 7"/></svg></div>
 
 <script>
 const BRIDGE = 'http://localhost:4747';
 const AREA_NAME = '✎ Annotate area (temp)';
+const SVG = p => `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const ICON = {
+  x: SVG('<path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/>'),
+  trash: SVG('<path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5"/>'),
+  undo: SVG('<path d="M5.5 4 3 6.5 5.5 9"/><path d="M3 6.5h6.25a3.25 3.25 0 0 1 0 6.5H7"/>'),
+  reply: SVG('<path d="M6 4 2.5 7.5 6 11"/><path d="M2.5 7.5H9a4.5 4.5 0 0 1 4.5 4.5v.5"/>'),
+  layers: SVG('<path d="M8 2.5 13.5 5.5 8 8.5 2.5 5.5z"/><path d="M2.5 9 8 12l5.5-3"/>'),
+};
 let ctx = { fileKey: null, fileName: '', pageName: '' };
 let sel = { nodes: [], total: 0, image: null };
 let targets = [];   // layers, frames and areas added to the note: { id, name, type, w, h, page, pageId, region, image, url }
@@ -182,6 +307,12 @@ let markersOn = true;
 let lastSig = '';
 let pendingAdd = null;
 const replyDrafts = {};
+const openReplies = new Set();
+let mentions = [];      // picked @mentions: { kind, id, key, name, sub, library }
+let hitId = null;       // the note covering the selected layer
+let quickPending = null;
+let shownCount = 0;
+let normalSize = { w: 360, h: 720 };
 const imgCache = new Map();
 
 const $ = id => document.getElementById(id);
@@ -194,13 +325,21 @@ function fileKeyFromUrl(u) {
   return m ? m[1] : null;
 }
 function effectiveKey() { return ctx.fileKey || fileKeyFromUrl($('fileUrl').value); }
+function showSetup() { $('setup').hidden = !!effectiveKey(); }
 
 window.onmessage = e => {
   const m = e.data && e.data.pluginMessage;
   if (!m) return;
-  if (m.type === 'context') { ctx = m; $('setup').classList.toggle('show', !effectiveKey()); refresh(true); }
-  if (m.type === 'saved-file-url') { $('fileUrl').value = m.value; $('setup').classList.toggle('show', !effectiveKey()); refresh(true); }
-  if (m.type === 'selection') { sel = m; renderTarget(); }
+  if (m.type === 'context') { ctx = m; showSetup(); refresh(true); }
+  if (m.type === 'saved-file-url') { $('fileUrl').value = m.value; showSetup(); refresh(true); }
+  if (m.type === 'selection') { sel = m; renderTarget(); highlightFor(m.path || []); if (quickPending) sendQuick(); }
+  if (m.type === 'quick-note') { quickPending = m.note; sendQuick(); }
+  if (m.type === 'libraries') renderLibraries(m.names || []);
+  if (m.type === 'prefs') {
+    if (m.bridgeRoot) { bridgeRoot = m.bridgeRoot; renderHelp(); }
+    if (m.size && m.size.w && m.size.h) normalSize = { w: m.size.w, h: m.size.h };
+  }
+  if (m.type === 'mention-results') showMentions(m.q, m.results || []);
   if (m.type === 'markers-pref') { markersOn = m.value; $('markers').checked = m.value; syncMarkers(); }
   if (m.type === 'patch-result') onPatchResult(m);
   if (m.type === 'targets-added') onTargetsAdded(m.targets || []);
@@ -216,18 +355,17 @@ function renderTarget() {
   thumbUrl = sel.image ? URL.createObjectURL(new Blob([sel.image], { type: 'image/png' })) : null;
   $('thumb').style.backgroundImage = thumbUrl ? `url(${thumbUrl})` : '';
   if (!sel.nodes.length) {
-    $('tName').textContent = 'Nothing selected';
-    $('tMeta').textContent = 'Select layers or frames, or an area.';
+    $('tName').textContent = targets.length ? `${targets.length} added` : 'Nothing selected';
+    $('tMeta').textContent = targets.length ? 'Select more to add them too.' : `The note is about the page${ctx.pageName ? ' “' + ctx.pageName + '”' : ''}.`;
   } else if (selectionIsArea()) {
     const n = sel.nodes[0];
     $('tName').textContent = 'Area';
-    $('tMeta').textContent = `${n.w}×${n.h} · drag or resize the box, then Add area`;
+    $('tMeta').textContent = `${n.w}×${n.h}`;
   } else {
     const first = sel.nodes[0];
     $('tName').textContent = sel.total > 1 ? `${first.name} + ${sel.total - 1} more` : first.name;
     $('tMeta').textContent = sel.total > 1 ? `${sel.total} layers selected` : `${first.type.toLowerCase()} · ${first.w}×${first.h}`;
   }
-  $('addSel').textContent = selectionIsArea() ? 'Add area' : 'Add selection';
   updateSend();
 }
 
@@ -243,19 +381,20 @@ function onTargetsAdded(list) {
   }
   renderTargets();
   if (pendingAdd) { pendingAdd(); pendingAdd = null; }
-  updateSend();
+  renderTarget();
 }
 function renderTargets() {
+  $('targets').hidden = !targets.length;
   $('targets').innerHTML = targets.map((t, i) => {
-    const label = t.type === 'AREA' ? `Area ${Math.round(t.w)}×${Math.round(t.h)}${t.region && t.region.frameName ? ' in ' + t.region.frameName : ''}` : `${t.name} · ${t.w}×${t.h}`;
-    return `<div class="tchip"><div class="tt" ${t.url ? `style="background-image:url(${t.url})"` : ''}></div><span class="tn" title="${esc(label)}">${esc(label)}</span><button class="rm" type="button" data-rm-target="${i}" title="Remove">×</button></div>`;
+    const label = t.type === 'AREA' ? `Area ${Math.round(t.w)}×${Math.round(t.h)}${t.region && t.region.frameName ? ' · ' + t.region.frameName : ''}` : t.name;
+    return `<span class="tchip" title="${esc(label)}"><span class="tt" ${t.url ? `style="background-image:url(${t.url})"` : ''}></span><span class="tn">${esc(label)}</span><button class="x" type="button" data-rm-target="${i}" title="Remove">${ICON.x}</button></span>`;
   }).join('');
 }
 function clearTargets() { targets.forEach(t => t.url && URL.revokeObjectURL(t.url)); targets = []; renderTargets(); }
 $('targets').addEventListener('click', e => {
   const rm = e.target.closest('[data-rm-target]'); if (!rm) return;
   const [gone] = targets.splice(Number(rm.dataset.rmTarget), 1); if (gone && gone.url) URL.revokeObjectURL(gone.url);
-  renderTargets(); updateSend();
+  renderTargets(); renderTarget();
 });
 $('addSel').onclick = async () => { if (!sel.nodes.length) return; $('addSel').disabled = true; await requestTargets(); updateSend(); };
 $('makeArea').onclick = () => post({ type: 'open-picker' });
@@ -315,27 +454,19 @@ async function addRaw(f) {
 }
 
 function renderFiles() {
-  $('attach').querySelectorAll('.athumb, .fchip').forEach(e => e.remove());
-  const before = $('addFile');
-  files.forEach((p, i) => {
-    const d = document.createElement('div');
-    if (p.isImage && p.preview) {
-      d.className = 'athumb'; d.style.backgroundImage = `url(${p.preview})`; d.title = `${p.name} · ${fmtSize(p.size)}`;
-      d.innerHTML = `<button class="rm" type="button" data-rm-file="${i}" title="Remove">×</button>`;
-    } else {
-      d.className = 'fchip'; d.title = `${p.name} · ${fmtSize(p.size)}`;
-      d.innerHTML = `<span class="ext">${esc((extOf(p.name) || 'file').slice(0, 4).toUpperCase())}</span><span class="fn">${esc(p.name)}</span><span class="muted">${fmtSize(p.size)}</span><button class="rm" type="button" data-rm-file="${i}" title="Remove">×</button>`;
-    }
-    $('attach').insertBefore(d, before);
-  });
-  $('addFile').style.display = files.length >= MAX_FILES ? 'none' : '';
-  $('fileHint').textContent = files.length ? `${files.length}/${MAX_FILES} files` : 'Drop, paste or add photos and files.';
+  const box = $('files');
+  box.hidden = !files.length;
+  box.innerHTML = files.map((p, i) => p.isImage && p.preview
+    ? `<span class="athumb" title="${esc(p.name)} · ${fmtSize(p.size)}" style="background-image:url(${p.preview})"><button class="x" type="button" data-rm-file="${i}" title="Remove">${ICON.x}</button></span>`
+    : `<span class="fchip" title="${esc(p.name)} · ${fmtSize(p.size)}"><span class="ext">${esc((extOf(p.name) || 'file').slice(0, 4).toUpperCase())}</span><span class="fn">${esc(p.name)}</span><span class="muted">${fmtSize(p.size)}</span><button class="x" type="button" data-rm-file="${i}" title="Remove">${ICON.x}</button></span>`).join('');
+  $('addFile').disabled = files.length >= MAX_FILES;
+  $('fileHint').textContent = files.length > 1 ? `${files.length}/${MAX_FILES}` : '';
 }
 function clearFiles() { files.forEach(p => p.preview && URL.revokeObjectURL(p.preview)); files = []; renderFiles(); }
 
 $('addFile').onclick = () => $('fileInput').click();
 $('fileInput').addEventListener('change', async e => { await addFiles([...e.target.files]); e.target.value = ''; });
-$('attach').addEventListener('click', e => {
+$('files').addEventListener('click', e => {
   const rm = e.target.closest('[data-rm-file]'); if (!rm) return;
   const [gone] = files.splice(Number(rm.dataset.rmFile), 1); if (gone && gone.preview) URL.revokeObjectURL(gone.preview);
   renderFiles();
@@ -379,13 +510,13 @@ function openPicker(b) {
   $('pkImg').onload = () => { pk.nat = { w: $('pkImg').naturalWidth, h: $('pkImg').naturalHeight }; pkLayout(); };
   $('pkImg').src = pk.url;
   $('picker').hidden = false;
-  post({ type: 'resize', w: 780, h: 720 });
+  post({ type: 'resize', w: Math.max(780, normalSize.w), h: Math.max(720, normalSize.h) });
   pkRender();
 }
 function closePicker() {
   if (pk && pk.url) URL.revokeObjectURL(pk.url);
   pk = null; $('picker').hidden = true; $('pkImg').removeAttribute('src');
-  post({ type: 'resize', w: 340, h: 700 });
+  post({ type: 'resize', w: normalSize.w, h: normalSize.h });
 }
 function pkLayout() {
   if (!pk || !pk.nat) return;
@@ -408,7 +539,7 @@ function pkRender() {
   pk.regions.forEach((r, i) => draw(r, i + 1, false));
   if (pk.drag && pk.drag.moved) draw(dragRect(pk.drag), '', true);
   const n = pk.regions.length;
-  $('pkAdd').textContent = n ? `Add ${n} area${n > 1 ? 's' : ''}` : 'Add';
+  $('pkAdd').textContent = n ? `Add ${n}` : 'Add';
   $('pkAdd').disabled = !n;
   $('pkUndo').disabled = !n;
 }
@@ -418,7 +549,8 @@ function pkPoint(e) { const r = $('pkLayer').getBoundingClientRect(); return { x
 
 $('pkLayer').addEventListener('pointerdown', e => {
   if (!pk) return;
-  e.preventDefault(); $('pkLayer').setPointerCapture(e.pointerId);
+  e.preventDefault();
+  try { $('pkLayer').setPointerCapture(e.pointerId); } catch (err) {}
   const p = pkPoint(e); pk.drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y, moved: false };
 });
 $('pkLayer').addEventListener('pointermove', e => {
@@ -428,7 +560,7 @@ $('pkLayer').addEventListener('pointermove', e => {
   pk.drag.moved = Math.abs(p.x - pk.drag.x0) * r.width > 6 || Math.abs(p.y - pk.drag.y0) * r.height > 6;
   pkRender();
 });
-$('pkLayer').addEventListener('pointerup', e => {
+$('pkLayer').addEventListener('pointerup', () => {
   if (!pk || !pk.drag) return;
   const d = pk.drag; pk.drag = null;
   if (d.moved) pk.regions.push(dragRect(d));
@@ -443,12 +575,6 @@ $('pkCancel').onclick = closePicker;
 $('pkIn').onclick = () => { if (pk) { pk.zoom = Math.min(6, pk.zoom * 1.5); pkLayout(); } };
 $('pkOut').onclick = () => { if (pk) { pk.zoom = Math.max(0.4, pk.zoom / 1.5); pkLayout(); } };
 window.addEventListener('resize', pkLayout);
-document.addEventListener('keydown', e => {
-  if (!pkOpen()) return;
-  if (e.key === 'Escape') closePicker();
-  else if (e.key === 'Enter') $('pkAdd').click();
-  else if (e.key === 'Backspace' || e.key === 'Delete') $('pkUndo').click();
-});
 
 const canvasToBytes = (c, type, q) => new Promise(r => c.toBlob(async b => r(new Uint8Array(await b.arrayBuffer())), type, q));
 
@@ -479,6 +605,8 @@ $('pkAdd').onclick = async () => {
   pk.crops = crops;
   pk.markup = await canvasToBytes(m, 'image/png');
   post({ type: 'picker-commit', backdrop: { x: pk.backdrop.x, y: pk.backdrop.y, w: pk.backdrop.w, h: pk.backdrop.h }, regions: pk.regions });
+  const mine = pk;
+  setTimeout(() => { if (pk === mine) { $('pkAdd').disabled = false; notify('Could not add the areas, try again'); } }, 4000);
 };
 
 function onPickerResult(list) {
@@ -493,7 +621,8 @@ function onPickerResult(list) {
 }
 
 // ---------- composing and sending ----------
-function canCompose() { return (targets.length || sel.nodes.length) && $('note').value.trim() && effectiveKey(); }
+// no target is fine: the note is then about the whole page
+function canCompose() { return $('note').value.trim() && effectiveKey(); }
 function updateSend() {
   $('send').disabled = !(online && canCompose());
   $('queue').disabled = !canCompose();
@@ -509,8 +638,7 @@ function seg(id) {
   });
   return () => root.querySelector('.on').dataset.v;
 }
-const getIntent = seg('intent');
-const getPriority = seg('priority');
+const getVariations = seg('variations');
 
 const toNode = t => ({ id: t.id, name: t.name, type: t.type, w: t.w, h: t.h, page: t.page, pageId: t.pageId, region: t.region, image: t.image ? toBase64(t.image) : null });
 
@@ -524,8 +652,12 @@ async function gatherNodes() {
 async function currentDraft() {
   return {
     fileKey: effectiveKey(), fileName: ctx.fileName, pageName: ctx.pageName,
-    nodes: await gatherNodes(), note: $('note').value.trim(),
-    intent: getIntent(), priority: getPriority(),
+    pageId: ctx.pageId, nodes: await gatherNodes(), note: $('note').value.trim(),
+    intent: 'change', priority: $('urgent').checked ? 'urgent' : 'normal',
+    mentions: mentions.filter(m => $('note').value.includes('@' + m.name)),
+    library: $('library').value || null,
+    variations: Number(getVariations()),
+    useComments: $('useComments').checked,
     attachments: files.map(p => ({ name: p.name, mime: p.mime, data: p.data })),
   };
 }
@@ -534,7 +666,35 @@ async function postNote(body) {
   const r = await fetch(BRIDGE + '/annotations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error((await r.json()).error);
 }
-function resetComposer() { $('note').value = ''; clearFiles(); clearTargets(); }
+// versions and comments are per note; the library choice stays
+function resetComposer() {
+  $('note').value = ''; mentions = []; hideMentions(); clearFiles(); clearTargets();
+  $('variations').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === '1'));
+  $('useComments').checked = false;
+  $('urgent').checked = false;
+  optionsSummary(); renderTarget();
+}
+
+// options open over the notes and close when you click elsewhere
+function setOpts(open) {
+  $('opts').hidden = !open;
+  $('optsBtn').setAttribute('aria-expanded', String(open));
+  $('optsBtn').classList.toggle('on', open);
+}
+$('optsBtn').onclick = e => { e.stopPropagation(); setOpts($('opts').hidden); };
+document.addEventListener('mousedown', e => { if (!$('opts').hidden && !e.target.closest('#opts, #optsBtn')) setOpts(false); });
+// a non-default option shows under the note, so a closed menu never hides a choice
+function optionsSummary() {
+  const v = getVariations();
+  const on = [v !== '1' ? v + ' versions' : '', $('library').value ? ($('library').value === 'local' ? 'this file only' : $('library').value) : '',
+    $('useComments').checked ? 'Figma comments' : '', $('urgent').checked ? 'urgent' : ''].filter(Boolean);
+  $('optsBadge').hidden = !on.length;
+  $('optLine').hidden = !on.length;
+  $('optLine').textContent = on.join(' · ');
+  $('optsBtn').title = on.length ? 'Options: ' + on.join(', ') : 'Options';
+}
+['library', 'useComments', 'urgent'].forEach(id => $(id).addEventListener('change', optionsSummary));
+$('variations').addEventListener('click', () => setTimeout(optionsSummary));
 
 async function submit() {
   if ($('send').disabled) return;
@@ -557,14 +717,15 @@ async function addToBatch() {
   updateSend();
 }
 const nodeLabel = nodes => {
+  if (!nodes.length) return 'Whole page';
   const names = nodes.slice(0, 2).map(n => n.type === 'AREA' ? 'Area' : n.name);
   return names.join(', ') + (nodes.length > 2 ? ` +${nodes.length - 2}` : '');
 };
 function renderDrafts() {
-  $('batch').classList.toggle('show', drafts.length > 0);
+  $('batch').hidden = !drafts.length;
   $('batchTitle').textContent = `${drafts.length} note${drafts.length === 1 ? '' : 's'} in batch`;
   $('drafts').innerHTML = drafts.map((d, i) =>
-    `<div class="draft"><span class="muted">${i + 1}.</span><span class="t">${esc(nodeLabel(d.nodes))}: ${esc(d.note)}${d.attachments.length ? ` (+${d.attachments.length} file${d.attachments.length > 1 ? 's' : ''})` : ''}</span><button class="link" data-rm="${i}">remove</button></div>`).join('');
+    `<div class="draft"><span class="muted">${i + 1}.</span><span class="t" title="${esc(d.note)}">${esc(nodeLabel(d.nodes))}: ${esc(d.note)}${d.attachments.length ? ` (+${d.attachments.length})` : ''}</span><button class="x" type="button" data-rm="${i}" title="Remove">${ICON.x}</button></div>`).join('');
 }
 $('drafts').addEventListener('click', e => {
   const rm = e.target.closest('[data-rm]'); if (!rm) return;
@@ -577,7 +738,8 @@ $('batchSend').onclick = async () => {
   const batchId = 'b' + Date.now().toString(36).slice(-5);
   const total = drafts.length;
   try {
-    while (drafts.length) { await postNote({ ...drafts[0], batchId }); drafts.shift(); renderDrafts(); }
+    const batchMode = $('parallel').checked ? 'parallel' : 'order';
+    while (drafts.length) { await postNote({ ...drafts[0], batchId, batchMode }); drafts.shift(); renderDrafts(); }
     notify(`Sent ${total} notes to Claude`);
   } catch (err) { notify(`Sent ${total - drafts.length} of ${total}: ${err.message}`); }
   await refresh(true);
@@ -586,11 +748,98 @@ $('batchSend').onclick = async () => {
 
 $('send').onclick = submit;
 $('queue').onclick = addToBatch;
-$('note').addEventListener('input', updateSend);
-$('note').addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.shiftKey ? addToBatch() : submit(); } });
+$('note').addEventListener('input', () => { updateSend(); keepBottom(); });
+$('note').addEventListener('keydown', e => {
+  if (mentionKey(e)) return;
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); e.shiftKey ? addToBatch() : submit(); }
+});
+// when the note box grows, the newest note stays in view
+let wasAtBottom = true;
+$('list').addEventListener('scroll', () => { const l = $('list'); wasAtBottom = l.scrollHeight - l.scrollTop - l.clientHeight < 40; }, { passive: true });
+function keepBottom() { if (wasAtBottom) requestAnimationFrame(() => { $('list').scrollTop = $('list').scrollHeight; }); }
+
+// ---------- @mentions ----------
+let mOpts = [], mIndex = 0, mQuery = null;
+function mentionQuery() {
+  const ta = $('note'), before = ta.value.slice(0, ta.selectionStart);
+  const m = /(^|\s)@([^\s@]{0,40})$/.exec(before);
+  return m ? m[2] : null;
+}
+$('note').addEventListener('input', () => {
+  mQuery = mentionQuery();
+  if (mQuery === null) return hideMentions();
+  post({ type: 'mention-search', q: mQuery });
+});
+$('note').addEventListener('blur', () => setTimeout(hideMentions, 150));
+$('atBtn').onclick = () => {
+  const ta = $('note'), pos = ta.selectionStart ?? ta.value.length;
+  const pre = ta.value.slice(0, pos), lead = pre && !/\s$/.test(pre) ? ' @' : '@';
+  ta.value = pre + lead + ta.value.slice(pos);
+  ta.focus(); ta.setSelectionRange(pos + lead.length, pos + lead.length);
+  ta.dispatchEvent(new Event('input'));
+};
+function showMentions(q, results) {
+  if (q !== mQuery) return; // an older answer
+  mOpts = results; mIndex = 0;
+  const box = $('mention');
+  box.innerHTML = results.length
+    ? results.map((r, i) => `<div class="opt${i ? '' : ' on'}" data-i="${i}"><b>${esc(r.name)}</b><span>${esc(r.sub)}${r.library ? ' · ' + esc(r.library) : ''}</span></div>`).join('')
+    : `<div class="none">Nothing called “${esc(q)}” in this file or its libraries</div>`;
+  box.hidden = false;
+}
+function hideMentions() { $('mention').hidden = true; mOpts = []; }
+function pickMention(i) {
+  const r = mOpts[i]; if (!r) return;
+  const ta = $('note'), pos = ta.selectionStart;
+  const start = ta.value.slice(0, pos).lastIndexOf('@');
+  ta.value = ta.value.slice(0, start) + '@' + r.name + ' ' + ta.value.slice(pos);
+  const caret = start + r.name.length + 2;
+  ta.setSelectionRange(caret, caret);
+  if (!mentions.some(m => m.kind === r.kind && (m.key || m.id) === (r.key || r.id))) mentions.push(r);
+  if (r.kind === 'library' && [...$('library').options].some(o => o.value === r.name)) { $('library').value = r.name; optionsSummary(); }
+  hideMentions(); ta.focus(); updateSend();
+}
+function mentionKey(e) {
+  if ($('mention').hidden || !mOpts.length) { if (e.key === 'Escape') hideMentions(); return false; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    mIndex = (mIndex + (e.key === 'ArrowDown' ? 1 : mOpts.length - 1)) % mOpts.length;
+    $('mention').querySelectorAll('.opt').forEach((o, i) => o.classList.toggle('on', i === mIndex));
+  } else if ((e.key === 'Enter' && !e.metaKey && !e.ctrlKey) || e.key === 'Tab') pickMention(mIndex);
+  else if (e.key === 'Escape') hideMentions();
+  else return false;
+  e.preventDefault();
+  return true;
+}
+$('mention').addEventListener('mousedown', e => { const o = e.target.closest('.opt'); if (o) { e.preventDefault(); pickMention(Number(o.dataset.i)); } });
+
+function renderLibraries(names) {
+  const keep = $('library').value;
+  $('library').innerHTML = '<option value="">Any library</option><option value="local">This file only</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  $('library').value = [...$('library').options].some(o => o.value === keep) ? keep : '';
+}
+
+// ---------- quick action: the note typed in Figma's quick actions goes out with the selection ----------
+async function sendQuick() {
+  if (!quickPending || !effectiveKey() || !online) return;
+  $('note').value = quickPending; quickPending = null;
+  updateSend();
+  await submit();
+}
+
+// ---------- selecting a layer on the canvas highlights the note about it ----------
+function noteCovers(it, path) {
+  return it.nodes.some(n => n.type === 'AREA' ? path.includes(n.region && n.region.frameId) : path.includes(n.id));
+}
+function highlightFor(path) {
+  const it = path.length ? items.find(i => i.status !== 'done' && noteCovers(i, path)) || items.find(i => noteCovers(i, path)) : null;
+  hitId = it ? it.id : null;
+  document.querySelectorAll('.item.hit').forEach(el => el.classList.remove('hit'));
+  const el = hitId && document.querySelector(`.item[data-id="${hitId}"]`);
+  if (el) { el.classList.add('hit'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+}
 $('fileUrl').addEventListener('input', () => {
   post({ type: 'save-file-url', value: $('fileUrl').value });
-  $('setup').classList.toggle('show', !effectiveKey());
+  showSetup();
   refresh(true);
 });
 $('markers').addEventListener('change', e => { markersOn = e.target.checked; post({ type: 'set-markers', value: markersOn }); syncMarkers(); });
@@ -600,8 +849,10 @@ async function refresh(force) {
   try {
     const key = effectiveKey();
     const r = await fetch(BRIDGE + '/annotations' + (key ? `?fileKey=${key}` : ''));
-    items = (await r.json()).reverse();
-    setOnline(true);
+    items = await r.json(); // oldest first, like a chat
+    const h = await (await fetch(BRIDGE + '/health')).json();
+    if (h.root && h.root !== bridgeRoot) { bridgeRoot = h.root; post({ type: 'set-pref', key: 'bridgeRoot', value: h.root }); }
+    setOnline(true, !!h.claude);
     const sig = JSON.stringify(items);
     if (force || sig !== lastSig) { lastSig = sig; renderList(); syncMarkers(); }
   } catch { setOnline(false); }
@@ -611,45 +862,115 @@ function syncMarkers() {
   post({ type: 'sync-markers', enabled: markersOn, items: items.map(it => ({ id: it.id, status: it.status, note: it.note, nodeIds: it.nodes.filter(n => n.type !== 'AREA').map(n => n.id) })) });
 }
 
-function setOnline(v) {
+// three states: bridge off / bridge on but no Claude watching / Claude ready
+let bridgeRoot = '', connState = '', helpOpen = null;
+function setOnline(v, claude) {
   online = v;
-  $('dot').classList.toggle('on', v);
-  $('connText').textContent = v ? 'Claude connected' : 'bridge offline';
+  const state = !v ? 'off' : claude ? 'ready' : 'idle';
+  if (state !== connState) {
+    connState = state;
+    $('dot').className = 'dot' + (state === 'ready' ? ' on' : state === 'idle' ? ' wait' : '');
+    $('connText').textContent = { off: 'Bridge off', idle: 'Not watching', ready: 'Claude ready' }[state];
+    helpOpen = state !== 'ready';
+    renderHelp();
+  }
   updateSend();
+  if (v && quickPending) sendQuick();
 }
+const shq = p => "'" + p.replace(/'/g, "'\\''") + "'";
+function renderHelp() {
+  const h = {
+    off: { text: '<b>The bridge isn’t running.</b> It connects this panel to Claude Code. Install it once and it runs in the background from then on:',
+      cmd: bridgeRoot ? `cd ${shq(bridgeRoot)} && ./install.sh` : './install.sh', note: bridgeRoot ? 'Paste it in Terminal.' : 'Run it in Terminal, inside the figma-annotate folder.' },
+    idle: { text: '<b>Claude isn’t watching yet.</b> You can still send notes; they wait here. To start, type this in Claude Code, opened in the figma-annotate folder:',
+      cmd: '/watch-notes', note: '' },
+    ready: { text: '<b>Claude is watching.</b> Notes are picked up as soon as you send them.', cmd: '', note: '' },
+  }[connState];
+  if (!h) return;
+  $('help').hidden = !helpOpen;
+  $('helpText').innerHTML = h.text;
+  $('helpCmdRow').hidden = !h.cmd;
+  $('helpCmd').textContent = h.cmd;
+  $('helpNote').hidden = !h.note;
+  $('helpNote').textContent = h.note;
+}
+$('conn').onclick = () => { helpOpen = !helpOpen; renderHelp(); };
+$('helpClose').onclick = () => { helpOpen = false; renderHelp(); };
+$('helpCopy').onclick = () => {
+  const ta = document.createElement('textarea'); ta.value = $('helpCmd').textContent; document.body.appendChild(ta); ta.select();
+  let ok = false; try { ok = document.execCommand('copy'); } catch {}
+  ta.remove();
+  notify(ok ? 'Copied' : 'Select the text and copy it');
+};
 
-const LABEL = { pending: 'Waiting', working: 'Claude is working', question: 'Needs your answer', done: 'Done' };
+const LABEL = { pending: 'Waiting', working: 'Working', question: 'Needs answer', done: 'Done' };
 const staticKind = kind => /^(att|t)\d+$/.test(kind);
 const imgKey = (it, kind) => staticKind(kind) ? `${it.id}:${kind}` : `${it.id}:${kind}:${it.updatedAt}`;
 const imgStyle = (it, kind) => { const u = imgCache.get(imgKey(it, kind)); return u ? `style="background-image:url(${u})"` : ''; };
 
-function attachmentsHtml(it) {
+function mediaHtml(it) {
   const at = it.attachments || [];
-  const shots = it.nodes.length > 1 || it.nodes.some(n => n.region) ? it.nodes.map((n, i) => n.hasImage ? `<div class="ph sm" title="${esc(n.type === 'AREA' ? 'Area' : n.name)}" data-img="${it.id}:t${i + 1}" ${imgStyle(it, 't' + (i + 1))}></div>` : '').join('') : '';
-  const files = at.map(a => a.mime.startsWith('image/')
-    ? `<div class="ph" title="${esc(a.name)}" data-img="${it.id}:att${a.n}" ${imgStyle(it, 'att' + a.n)}></div>`
+  const shots = it.nodes.length > 1 || it.nodes.some(n => n.region) ? it.nodes.map((n, i) => n.hasImage ? `<span class="ph sm" title="${esc(n.type === 'AREA' ? 'Area' : n.name)}" data-img="${it.id}:t${i + 1}" ${imgStyle(it, 't' + (i + 1))}></span>` : '').join('') : '';
+  const fl = at.map(a => a.mime.startsWith('image/')
+    ? `<span class="ph" title="${esc(a.name)}" data-img="${it.id}:att${a.n}" ${imgStyle(it, 'att' + a.n)}></span>`
     : `<span class="fchip" title="${esc(a.name)}"><span class="ext">${esc((extOf(a.name) || 'file').slice(0, 4).toUpperCase())}</span><span class="fn">${esc(a.name)}</span>${a.size ? `<span class="muted">${fmtSize(a.size)}</span>` : ''}</span>`).join('');
-  return shots || files ? `<div class="photos">${shots}${files}</div>` : '';
+  return shots || fl ? `<div class="media">${shots}${fl}</div>` : '';
 }
 
+function itemHtml(it) {
+  const thread = it.thread.map(t => `<div class="msg ${t.from}">${t.from === 'system' ? '' : `<small>${t.from === 'claude' ? 'Claude' : 'You'}</small>`}${esc(t.text)}</div>`).join('');
+  const meta = [it.priority === 'urgent' ? 'urgent' : '', it.variations > 1 ? `${it.variations} versions` : '', it.library ? `library: ${it.library === 'local' ? 'this file' : it.library}` : '',
+    (it.mentions || []).length ? '@ ' + it.mentions.map(m => m.name).join(', ') : '', it.useComments ? 'uses comments' : '', it.batchMode === 'parallel' ? 'parallel' : ''].filter(Boolean).join(' · ');
+  const showCmp = it.status === 'done' && it.hasBefore && it.hasAfter;
+  const canUndo = it.status === 'done' && it.patch && !it.reverted;
+  const replyOpen = !it.reverted && (it.status === 'question' || openReplies.has(it.id) || replyDrafts[it.id]);
+  const placeholder = { question: 'Answer Claude…', done: 'Not quite right? Say why…', working: 'Add something while Claude works…', pending: 'Add to this note…' }[it.status];
+  const st = it.reverted ? 'reverted' : it.status;
+  return `<article class="item${it.id === hitId ? ' hit' : ''}" data-id="${it.id}">
+    <div class="top"><span class="who" title="${esc(nodeLabel(it.nodes))}">#${it.id} · ${esc(nodeLabel(it.nodes))}${it.batchId ? ' · batch' : ''}</span><span class="st ${st}">${it.reverted ? 'Reverted' : LABEL[it.status]}</span></div>
+    <div class="you">${esc(it.note)}</div>
+    ${meta ? `<div class="meta">${esc(meta)}</div>` : ''}${mediaHtml(it)}${thread}
+    ${showCmp ? `<div class="cmp"><figure><div class="img" data-img="${it.id}:before" ${imgStyle(it, 'before')}></div><figcaption>Before</figcaption></figure><figure><div class="img" data-img="${it.id}:after" ${imgStyle(it, 'after')}></div><figcaption>After</figcaption></figure></div>` : ''}
+    ${replyOpen ? `<div class="reply"><input class="replyInput" type="text" data-id="${it.id}" value="${esc(replyDrafts[it.id] || '')}" placeholder="${placeholder}"></div>` : ''}
+    <div class="acts">
+      ${it.focus && it.focus.length ? `<button class="btn ghost sm" type="button" data-select="${it.id}">${ICON.layers}Select ${it.focus.length}</button>` : ''}
+      ${canUndo ? `<button class="btn ghost sm" type="button" data-undo="${it.id}">${ICON.undo}Undo</button>` : ''}
+      <span class="grow"></span>
+      ${!it.reverted && !replyOpen ? `<button class="ib" type="button" data-reply="${it.id}" title="Reply">${ICON.reply}</button>` : ''}
+      <button class="ib" type="button" data-del="${it.id}" title="Delete">${ICON.trash}</button>
+    </div>
+  </article>`;
+}
+
+// only the notes that changed are redrawn, so scrolling, typing and pictures stay put
+const itemSig = it => JSON.stringify([it.updatedAt, it.status, it.thread.length, it.reverted, (it.focus || []).length, !!it.patch, it.hasBefore, it.hasAfter, openReplies.has(it.id), !!replyDrafts[it.id]]);
 function renderList() {
-  const active = document.activeElement;
-  if (active && active.classList && active.classList.contains('replyInput')) return;
-  if (!items.length) { $('list').innerHTML = '<div class="empty muted">No notes yet.</div>'; return; }
-  $('list').innerHTML = items.map(it => {
-    const thread = it.thread.map(t => `<div class="msg ${t.from}">${t.from === 'system' ? '' : `<small>${t.from === 'claude' ? 'Claude' : 'You'}</small>`}${esc(t.text)}</div>`).join('');
-    const canReply = it.status === 'question' || it.status === 'done';
-    const showCmp = it.status === 'done' && it.hasBefore && it.hasAfter;
-    const canUndo = it.status === 'done' && it.patch && !it.reverted;
-    const batch = it.batchId ? ` · batch ${esc(it.batchId)}` : '';
-    return `<div class="item" data-id="${it.id}">
-      <div class="top"><span class="muted">#${it.id} · ${esc(nodeLabel(it.nodes))}${batch}</span><span class="chip ${it.reverted ? 'reverted' : it.status}">${it.reverted ? 'Reverted' : LABEL[it.status]}</span></div>
-      <div>${esc(it.note)}</div>${attachmentsHtml(it)}${thread}
-      ${showCmp ? `<div class="cmp"><figure><div class="img" data-img="${it.id}:before" ${imgStyle(it, 'before')}></div><figcaption>Before</figcaption></figure><figure><div class="img" data-img="${it.id}:after" ${imgStyle(it, 'after')}></div><figcaption>After</figcaption></figure></div>` : ''}
-      ${canReply ? `<div class="reply"><input class="replyInput" type="text" data-id="${it.id}" value="${esc(replyDrafts[it.id] || '')}" placeholder="${it.status === 'question' ? 'Answer Claude…' : 'Not quite right? Say why…'}"></div>` : ''}
-      <div class="acts">${it.focus && it.focus.length ? `<button class="btn ghost small" data-select="${it.id}">Select ${it.focus.length} layers</button>` : ''}${canUndo ? `<button class="btn ghost small" data-undo="${it.id}">Undo change</button>` : ''}<button class="link" data-del="${it.id}">Delete</button></div>
-    </div>`;
-  }).join('');
+  const list = $('list');
+  if (!items.length) {
+    list.innerHTML = `<div class="empty"><b>No notes yet</b><ol><li>Select layers or a frame on the canvas, or nothing for the whole page.</li><li>Write what should change below.</li><li>Send. Claude edits the file and answers here.</li></ol></div>`;
+    shownCount = 0; return;
+  }
+  const emptyEl = list.querySelector('.empty'); if (emptyEl) emptyEl.remove();
+  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40, grew = items.length > shownCount;
+  shownCount = items.length;
+  const seen = new Set();
+  let prev = null;
+  for (const it of items) {
+    seen.add(it.id);
+    let el = list.querySelector(`.item[data-id="${it.id}"]`);
+    const sig = itemSig(it);
+    const typing = el && document.activeElement && el.contains(document.activeElement);
+    if ((!el || el.dataset.sig !== sig) && !typing) {
+      const tmp = document.createElement('div'); tmp.innerHTML = itemHtml(it).trim();
+      const fresh = tmp.firstElementChild; fresh.dataset.sig = sig;
+      if (el) el.replaceWith(fresh); else if (prev) prev.after(fresh); else list.prepend(fresh);
+      el = fresh;
+    }
+    if (prev ? prev.nextElementSibling !== el : list.firstElementChild !== el) { if (prev) prev.after(el); else list.prepend(el); }
+    prev = el;
+  }
+  list.querySelectorAll('.item').forEach(el => { if (!seen.has(el.dataset.id)) el.remove(); });
+  if (grew || atBottom) list.scrollTop = list.scrollHeight;
   loadImages();
 }
 
@@ -690,11 +1011,19 @@ function focusNote(it) {
   if (area) post({ type: 'focus-region', region: area.region, pageId: area.pageId });
 }
 
+function redrawItem(id) { const it = items.find(i => i.id === id); const el = document.querySelector(`.item[data-id="${id}"]`); if (it && el) { el.dataset.sig = ''; renderList(); } }
+
 $('list').addEventListener('click', async e => {
   const select = e.target.closest('[data-select]');
   if (select) { const it = items.find(i => i.id === select.dataset.select); if (it && it.focus) post({ type: 'focus', ids: it.focus }); return; }
   const undo = e.target.closest('[data-undo]');
   if (undo) { const it = items.find(i => i.id === undo.dataset.undo); if (it && it.patch) post({ type: 'apply-patch', id: it.id, patch: it.patch }); return; }
+  const reply = e.target.closest('[data-reply]');
+  if (reply) {
+    const id = reply.dataset.reply; openReplies.add(id); redrawItem(id);
+    const input = document.querySelector(`.replyInput[data-id="${id}"]`); if (input) input.focus();
+    return;
+  }
   const del = e.target.closest('[data-del]');
   if (del) {
     const it = items.find(i => i.id === del.dataset.del);
@@ -702,23 +1031,65 @@ $('list').addEventListener('click', async e => {
     await fetch(`${BRIDGE}/annotations/${del.dataset.del}`, { method: 'DELETE' });
     return refresh(true);
   }
-  if (e.target.classList.contains('replyInput')) return;
+  if (e.target.closest('.reply')) return;
   const item = e.target.closest('.item');
   if (item) { const it = items.find(i => i.id === item.dataset.id); if (it) focusNote(it); }
 });
 
 $('list').addEventListener('input', e => { if (e.target.classList.contains('replyInput')) replyDrafts[e.target.dataset.id] = e.target.value; });
+$('list').addEventListener('focusout', e => {
+  if (!e.target.classList.contains('replyInput')) return;
+  const id = e.target.dataset.id;
+  if (!e.target.value.trim()) { delete replyDrafts[id]; openReplies.delete(id); }
+  setTimeout(() => renderList()); // anything that changed while typing
+});
 $('list').addEventListener('keydown', async e => {
-  if (!e.target.classList.contains('replyInput') || e.key !== 'Enter') return;
-  const id = e.target.dataset.id, text = e.target.value.trim();
+  if (!e.target.classList.contains('replyInput')) return;
+  const id = e.target.dataset.id;
+  if (e.key === 'Escape') { e.target.value = ''; e.target.blur(); return; }
+  if (e.key !== 'Enter') return;
+  const text = e.target.value.trim();
   if (!text) return;
   await fetch(`${BRIDGE}/annotations/${id}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'user', text }) });
-  delete replyDrafts[id];
+  delete replyDrafts[id]; openReplies.delete(id);
+  e.target.value = '';
   e.target.blur();
   refresh(true);
 });
 
+// ---------- keyboard ----------
+document.addEventListener('keydown', e => {
+  if (pkOpen()) {
+    if (e.key === 'Escape') closePicker();
+    else if (e.key === 'Enter') $('pkAdd').click();
+    else if (e.key === 'Backspace' || e.key === 'Delete') $('pkUndo').click();
+    return;
+  }
+  if (e.key === 'Escape' && !$('opts').hidden) setOpts(false);
+});
+
+// ---------- resizing the panel from its corner ----------
+(() => {
+  let start = null, raf = 0, next = null;
+  const grip = $('grip');
+  grip.addEventListener('pointerdown', e => {
+    e.preventDefault(); try { grip.setPointerCapture(e.pointerId); } catch (err) {}
+    start = { x: e.screenX, y: e.screenY, w: window.innerWidth || normalSize.w, h: window.innerHeight || normalSize.h };
+  });
+  grip.addEventListener('pointermove', e => {
+    if (!start) return;
+    next = { w: Math.min(900, Math.max(300, start.w + e.screenX - start.x)), h: Math.min(1200, Math.max(420, start.h + e.screenY - start.y)) };
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (next) post({ type: 'resize', w: next.w, h: next.h }); });
+  });
+  const end = () => {
+    if (!start) return; start = null;
+    if (next) { normalSize = next; post({ type: 'set-pref', key: 'size', value: next }); }
+  };
+  grip.addEventListener('pointerup', end); grip.addEventListener('pointercancel', end);
+})();
+
 post({ type: 'ready' });
+renderTarget(); renderFiles(); optionsSummary();
 refresh(true);
 setInterval(() => refresh(false), 2000);
 </script>

@@ -23,6 +23,35 @@ function save() {
 }
 
 const STATUSES = ['pending', 'working', 'question', 'done'];
+// `fa watch` checks in every few seconds; the panel shows "Claude ready" only while it does
+let presence = { at: 0 };
+const LISTENING_MS = 12000;
+const listening = () => Date.now() - presence.at < LISTENING_MS;
+const PATCH_KEYS = ['set', 'remove', 'move', 'swap', 'bind', 'variables'];
+
+// Figma REST token for reading comments: FIGMA_TOKEN, or { "figmaToken": "..." } in data/config.json
+function figmaToken() {
+  if (process.env.FIGMA_TOKEN) return process.env.FIGMA_TOKEN;
+  try { return JSON.parse(fs.readFileSync(path.join(DATA, 'config.json'), 'utf8')).figmaToken || null; } catch { return null; }
+}
+
+// Comments of a file as threads: { id, nodeId, resolved, messages: [{ who, text, at }] }
+async function fileComments(fileKey) {
+  const token = figmaToken();
+  if (!token) throw Object.assign(new Error('no Figma token: set FIGMA_TOKEN or data/config.json { "figmaToken": "..." }'), { code: 412 });
+  const r = await fetch(`https://api.figma.com/v1/files/${encodeURIComponent(fileKey)}/comments`, { headers: { 'X-Figma-Token': token } });
+  if (!r.ok) throw Object.assign(new Error(`Figma API ${r.status}: ${(await r.text()).slice(0, 200)}`), { code: 502 });
+  const { comments = [] } = await r.json();
+  const threads = new Map();
+  for (const c of comments.filter(c => !c.parent_id)) {
+    threads.set(c.id, { id: c.id, nodeId: c.client_meta?.node_id || null, resolved: !!c.resolved_at, messages: [] });
+  }
+  for (const c of comments.slice().sort((a, b) => a.created_at.localeCompare(b.created_at))) {
+    const t = threads.get(c.parent_id || c.id);
+    if (t) t.messages.push({ who: c.user?.handle || 'someone', text: c.message, at: c.created_at });
+  }
+  return [...threads.values()];
+}
 const now = () => new Date().toISOString();
 
 function publicItem(it) {
@@ -83,14 +112,30 @@ const server = http.createServer(async (req, res) => {
   const parts = url.pathname.split('/').filter(Boolean);
 
   try {
-    if (url.pathname === '/health') return send(res, 200, { ok: true, count: db.items.length });
+    if (url.pathname === '/health') return send(res, 200, { ok: true, count: db.items.length, comments: !!figmaToken(), claude: listening(), root: ROOT });
+
+    if (req.method === 'POST' && url.pathname === '/presence') {
+      presence = { at: Date.now() };
+      return send(res, 200, { ok: true });
+    }
+
+    // Figma comments of a file (needs a token), optionally only open ones
+    if (req.method === 'GET' && parts[0] === 'comments' && parts.length === 2) {
+      try {
+        let threads = await fileComments(parts[1]);
+        if (url.searchParams.get('open') === '1') threads = threads.filter(t => !t.resolved);
+        return send(res, 200, threads);
+      } catch (e) { return send(res, e.code || 500, { error: e.message }); }
+    }
 
     // list
     if (req.method === 'GET' && parts[0] === 'annotations' && parts.length === 1) {
       const status = url.searchParams.get('status');
       const fileKey = url.searchParams.get('fileKey');
       let items = db.items;
-      if (status) items = items.filter(i => status.split(',').includes(i.status));
+      // ?status=pending&unread=1: pending items, plus any item with a user message Claude hasn't seen
+      const unread = url.searchParams.get('unread') === '1';
+      if (status) items = items.filter(i => status.split(',').includes(i.status) || (unread && i.unread));
       if (fileKey) items = items.filter(i => i.fileKey === fileKey);
       return send(res, 200, items.map(publicItem));
     }
@@ -99,6 +144,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && parts[0] === 'annotations' && parts.length === 1) {
       const b = await readBody(req);
       if (!b.note || !String(b.note).trim()) return send(res, 400, { error: 'note required' });
+      const str = (v, n = 120) => String(v ?? '').replace(/[\u0000-\u001f]/g, '').slice(0, n);
       const id = String(++db.seq);
       let imageFile = null;
       if (b.image) {
@@ -149,6 +195,15 @@ const server = http.createServer(async (req, res) => {
         priority: b.priority || 'normal',
         imageFile,
         batchId: b.batchId || null,
+        batchMode: b.batchMode === 'parallel' ? 'parallel' : b.batchId ? 'order' : null,
+        // no target: the note is about the page (or the whole file)
+        pageId: b.pageId ? str(b.pageId, 40) : null,
+        // things the designer @mentioned: variables, styles, components, libraries ({ kind, id?, key?, name, sub, library? })
+        mentions: (Array.isArray(b.mentions) ? b.mentions : []).slice(0, 20).filter(m => m && m.name)
+          .map(m => ({ kind: str(m.kind, 20), id: m.id ? str(m.id, 80) : null, key: m.key ? str(m.key, 80) : null, name: str(m.name), sub: str(m.sub, 40), library: m.library ? str(m.library) : null })),
+        library: b.library ? str(b.library) : null,
+        variations: Math.max(1, Math.min(6, Number(b.variations) || 1)),
+        useComments: !!b.useComments,
         attachments,
         thread: [],
       };
@@ -186,8 +241,11 @@ const server = http.createServer(async (req, res) => {
         const from = b.from === 'claude' ? 'claude' : 'user';
         if (!b.text || !String(b.text).trim()) return send(res, 400, { error: 'text required' });
         it.thread.push({ from, text: String(b.text).trim(), at: now() });
-        // a user follow-up re-opens the item for Claude
-        if (from === 'user') it.status = 'pending';
+        // a user message is unread until Claude answers; it re-opens a finished item, and reaches Claude mid-work too
+        if (from === 'user') {
+          it.unread = true;
+          if (it.status !== 'working') it.status = 'pending';
+        } else it.unread = false;
         if (from === 'claude' && b.status) {
           if (!STATUSES.includes(b.status)) return send(res, 400, { error: 'bad status' });
           it.status = b.status;
@@ -210,8 +268,8 @@ const server = http.createServer(async (req, res) => {
       // revert patch recorded by Claude before it edits: { set: [{id, props}], remove: [ids] }
       if (req.method === 'POST' && parts[2] === 'patch') {
         const b = await readBody(req);
-        if (!b.patch || (!Array.isArray(b.patch.set) && !Array.isArray(b.patch.remove))) return send(res, 400, { error: 'patch.set and/or patch.remove required' });
-        it.patch = { set: b.patch.set || [], remove: b.patch.remove || [], move: b.patch.move || [] };
+        if (!b.patch || !PATCH_KEYS.some(k => Array.isArray(b.patch[k]) && b.patch[k].length)) return send(res, 400, { error: `patch needs one of: ${PATCH_KEYS.join(', ')}` });
+        it.patch = Object.fromEntries(PATCH_KEYS.map(k => [k, Array.isArray(b.patch[k]) ? b.patch[k] : []]));
         it.reverted = false;
         it.updatedAt = now();
         save();
@@ -232,6 +290,7 @@ const server = http.createServer(async (req, res) => {
         if (b.status) {
           if (!STATUSES.includes(b.status)) return send(res, 400, { error: 'bad status' });
           it.status = b.status;
+          if (b.status === 'working') it.unread = false; // claiming reads the latest message
         }
         // layers Claude points to; the plugin offers a "Select N layers" button for them
         if (Array.isArray(b.focus)) it.focus = b.focus.map(String).slice(0, 500);
@@ -257,6 +316,11 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+server.on('error', e => {
+  if (e.code === 'EADDRINUSE') console.error(`Port ${PORT} is taken: a bridge is probably already running (curl localhost:${PORT}/health).`);
+  else console.error(e.message);
+  process.exit(1);
+});
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`figma-annotate bridge listening on http://localhost:${PORT}`);
 });

@@ -9,7 +9,8 @@
 //   fa snapshot <id> before|after <png>   store a before/after screenshot (shown in the plugin)
 //   fa patch <id> <json-file>   store the revert patch so the plugin can Undo (see CLAUDE.md)
 //   fa focus <id> <json-file>   layers to select in Figma (JSON array of node ids); the plugin shows a Select button
-//   fa watch                    print one line per new/updated pending item (for Monitor)
+//   fa comments <fileKey|id> [--all]   Figma comment threads of the file (open ones unless --all); needs a token
+//   fa watch                    print one line per new note, follow-up or message while working (for Monitor)
 import fs from 'node:fs';
 const BASE = `http://localhost:${process.env.FA_PORT || 4747}`;
 
@@ -25,8 +26,13 @@ async function api(path, opts = {}) {
 }
 
 const oneLine = s => String(s).replace(/\s+/g, ' ').slice(0, 140);
-const batchLabel = it => (it.batchId ? ` [batch ${it.batchId}]` : '') + (it.attachments?.length ? ` [+${it.attachments.length} file${it.attachments.length > 1 ? 's' : ''}]` : '');
-const nodesLabel = it => it.nodes.map(n => n.region ? `area ${n.w}×${n.h} in "${n.region.frameName || 'page'}"` : `${n.name} (${n.id})`).join(', ') || 'no selection';
+const batchLabel = it => (it.batchId ? ` [batch ${it.batchId}${it.batchMode === 'parallel' ? ', parallel' : ''}]` : '')
+  + (it.attachments?.length ? ` [+${it.attachments.length} file${it.attachments.length > 1 ? 's' : ''}]` : '')
+  + (it.variations > 1 ? ` [${it.variations} variations]` : '')
+  + (it.mentions?.length ? ` [@ ${it.mentions.map(m => m.name).join(', ')}]` : '')
+  + (it.library ? ` [library ${it.library}]` : '')
+  + (it.useComments ? ' [use comments]' : '');
+const nodesLabel = it => it.nodes.map(n => n.region ? `area ${n.w}×${n.h} in "${n.region.frameName || 'page'}"` : `${n.name} (${n.id})`).join(', ') || `whole page "${it.pageName || '?'}"`;
 
 async function main() {
   const [cmd, a, ...rest] = process.argv.slice(2);
@@ -74,16 +80,30 @@ async function main() {
       await api(`/annotations/${a}/messages`, { method: 'POST', body: { from: 'claude', text, status } });
       return console.log(`#${a} ${status || 'replied'}`);
     }
+    case 'comments': {
+      if (!a) throw new Error('usage: fa comments <fileKey|note id> [--all]');
+      const key = /^\d+$/.test(a) ? (await api(`/annotations/${a}`)).fileKey : a;
+      const threads = await api(`/comments/${key}${rest.includes('--all') ? '' : '?open=1'}`);
+      if (!threads.length) return console.log('(no comments)');
+      for (const t of threads) {
+        console.log(`thread ${t.id}${t.nodeId ? ` on ${t.nodeId}` : ''}${t.resolved ? ' [resolved]' : ''}`);
+        for (const m of t.messages) console.log(`  ${m.who}: ${oneLine(m.text)}`);
+      }
+      return;
+    }
     case 'watch': {
       const seen = new Map(); // id -> updatedAt already announced
+      // tell the bridge someone is listening, so the panel can say "Claude ready"
+      const beat = () => fetch(BASE + '/presence', { method: 'POST' }).catch(() => {});
+      beat(); setInterval(beat, 4000);
       // Announce only what arrives after start, plus anything already pending once.
       for (;;) {
         try {
-          const items = await api('/annotations?status=pending');
+          const items = await api('/annotations?status=pending&unread=1');
           for (const it of items) {
             if (seen.get(it.id) === it.updatedAt) continue;
             seen.set(it.id, it.updatedAt);
-            const followup = it.thread.at(-1)?.from === 'user' ? ' (follow-up)' : '';
+            const followup = it.thread.at(-1)?.from === 'user' ? (it.status === 'working' ? ' (message while working)' : ' (follow-up)') : '';
             console.log(`NEW #${it.id}${followup}${batchLabel(it)} ${it.intent}/${it.priority}:${oneLine(it.thread.at(-1)?.from === 'user' ? it.thread.at(-1).text : it.note)} — ${nodesLabel(it)}`);
           }
         } catch (e) {
@@ -96,7 +116,7 @@ async function main() {
       }
     }
     default:
-      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|watch');
+      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|comments|watch');
   }
 }
 

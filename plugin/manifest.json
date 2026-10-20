@@ -7,6 +7,11 @@
   "ui": "ui.html",
   "enablePrivatePluginApi": true,
   "documentAccess": "dynamic-page",
+  "permissions": ["teamlibrary"],
+  "parameters": [
+    { "name": "Note", "key": "note", "description": "What should change? Sent with the selection", "allowFreeform": true }
+  ],
+  "parameterOnly": false,
   "networkAccess": {
     "allowedDomains": ["none"],
     "devAllowedDomains": ["http://localhost:4747"],
