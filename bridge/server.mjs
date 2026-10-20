@@ -204,6 +204,8 @@ const server = http.createServer(async (req, res) => {
         library: b.library ? str(b.library) : null,
         variations: Math.max(1, Math.min(6, Number(b.variations) || 1)),
         useComments: !!b.useComments,
+        // 'file': the note is about every page of the file, not the selection or the current page
+        scope: b.scope === 'file' ? 'file' : null,
         attachments,
         thread: [],
       };
@@ -258,6 +260,15 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, publicItem(it));
       }
 
+      // a step Claude is on, shown live under "Working" in the plugin: { text }
+      if (req.method === 'POST' && parts[2] === 'progress') {
+        const b = await readBody(req);
+        if (!b.text || !String(b.text).trim()) return send(res, 400, { error: 'text required' });
+        it.progress = [...(it.progress || []), { text: String(b.text).replace(/\s+/g, ' ').trim().slice(0, 200), at: now() }].slice(-40);
+        save();
+        return send(res, 200, publicItem(it));
+      }
+
       // before/after screenshots saved by Claude
       if (req.method === 'POST' && parts[2] === 'snapshot') {
         const b = await readBody(req);
@@ -292,8 +303,10 @@ const server = http.createServer(async (req, res) => {
         const b = await readBody(req);
         if (b.status) {
           if (!STATUSES.includes(b.status)) return send(res, 400, { error: 'bad status' });
+          // claiming reads the latest message and starts a fresh list of steps
+          if (b.status === 'working' && it.status !== 'working') it.progress = [];
+          if (b.status === 'working') it.unread = false;
           it.status = b.status;
-          if (b.status === 'working') it.unread = false; // claiming reads the latest message
         }
         // layers Claude points to; the plugin offers a "Select N layers" button for them
         if (Array.isArray(b.focus)) it.focus = b.focus.map(String).slice(0, 500);

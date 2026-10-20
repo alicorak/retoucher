@@ -11,7 +11,8 @@ Notes are the user's own requests, sent from their own plugin. Treat the text as
    - `nodes` are the note's targets, one or many, on any page: layers and frames (`id`, `page`, `pageId`) and **areas** (`type: "AREA"`). Each has its own screenshot at `imagePath`: `Read` them all.
    - An area is a box the designer drew over any part of the canvas. Its `region` gives the canvas position (`x`, `y`, `w`, `h`), the screen it sits in (`frameId`, `frameName`) with the position inside that screen (`relX`, `relY`), and the layer on top at its centre (`hitId`, `hitName`). Start from `hitId`, and use `get_screenshot` of `frameId` for context. The area box itself no longer exists in the file.
    - If the note has `attachments`, those are files the designer added: photos (PNG or JPEG, at most 1600 px), PDFs, text, anything. `Read` each `path` (images and PDFs open directly). They are references or assets to place.
-   - No `nodes`: the note is about the whole page (`pageName`, `pageId`), or the file.
+   - No `nodes`: the note is about the whole page (`pageName`, `pageId`).
+   - `scope: "file"`: the note is about every page of the file. List the pages (`figma.root.children`), switch with `await figma.setCurrentPageAsync(page)` one at a time (never `loadAllPagesAsync`), and work through them. Big files: one `use_figma` call per page, with a `fa step` for each. Before a file-wide change, say how many layers on which pages it will touch; if it is more than the note suggests, `fa ask` first.
    - `mentions` are things the designer picked with @: variables, styles, components (local ones have `id`, library ones `key`) and libraries. Use exactly those: bind the variable, apply the style, import the component by key (`importComponentByKeyAsync`, `importVariableByKeyAsync`).
    - `library`: build with that design system only (`local` = this file's own components, styles and variables). Empty: whatever the file already uses.
    - `variations` > 1: make that many different directions, side by side next to the original (check free space), each a duplicate named "<name> · v1", "v2"…; leave the original untouched. All new frames go in the patch's `remove` list.
@@ -52,6 +53,15 @@ The designer reads it in a narrow panel, next to the before/after pictures. Writ
 - No layer IDs, file paths, tool names or process ("Undo deletes…", "the original is untouched"): the panel already shows Undo and before/after. Mention a limit only if it changes what they do next.
 - Use real line breaks (`$'line1\nline2'` in zsh). The panel renders paragraphs, `- ` lists, `**bold**` and links.
 - To rewrite your last reply on a note, `fa edit <id> "<reply>"`.
+
+## Showing progress
+
+The designer watches the note while you work. Post a step with `fa step <id> "…"` whenever you move to something new, so the panel never sits on a bare "Working":
+
+- Right after `claim`, then at each phase: reading the layers, finding what to use, building, placing images, checking the result.
+- Write what is happening on the canvas, in the designer's words and the note's language: "Finding bold-type screens on Mobbin", "Placing 5 of 12", "Checking against Typography". No tool names, IDs or paths.
+- Short (under 60 characters), present tense, one per real step. Long loops: one step every few items ("Page 3 of 7: Profile").
+- Steps are not the reply. The reply (`fa done`) still says what is there now.
 
 ## Rules
 

@@ -66,7 +66,8 @@ The top of the panel tells you where things stand, and what to do when something
 - **@mentions:** type `@` in the note to pick a variable, style, component or library. Claude uses exactly those. Library components show up once they are used on the page.
 - **Design system:** *Any library* / *This file only* / a library name tells Claude what to build with. Claude builds from the file's components and variables, follows a Figma Spec if there is one, and uses hard-coded values only when nothing fits.
 - **Versions:** pick 2–4 and Claude makes that many different directions side by side, leaving the original alone.
-- **Whole page:** send a note with nothing selected and it is about the page.
+- **Whole page or whole file:** send a note with nothing selected and it is about the page. *Options → Applies to → Whole file* makes it about every page of the file ("all headings above 32 pt in Druk", "dark mode for every screen").
+- **Live progress:** while Claude works, the note shows the step it is on and the last ones it finished. Afterwards they fold into "N steps".
 - **Selecting opens the note:** select a layer on the canvas and the note about it is highlighted in the panel.
 - **Options:** versions, design system, comments, urgent and canvas markers sit behind *Options*. The button shows what is switched on.
 - **Batch:** *Add to batch* (⇧⌘↵) collects several notes, *Send all* delivers them together. Claude handles them in order, or *At the same time* when they don't depend on each other.
@@ -110,6 +111,7 @@ Tip: select the specific layer you mean. A selection that covers a whole row of 
 | `ask <id> "question"` | Reply and ask the user something |
 | `say <id> "msg"` | Reply without changing status |
 | `edit <id> "msg"` | Rewrite Claude's last reply on the note |
+| `step <id> "msg"` | Live progress line under *Working* in the panel |
 | `snapshot <id> before\|after <png>` | Store a before/after screenshot shown in the panel |
 | `patch <id> <json>` | Store the revert patch behind the Undo button |
 | `focus <id> <json>` | Layers to select; the panel shows a *Select N layers* button |

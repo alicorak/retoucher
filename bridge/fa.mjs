@@ -7,6 +7,7 @@
 //   fa ask <id> "question"      reply and mark as needing the user's answer
 //   fa say <id> "message"       reply without changing status
 //   fa edit <id> "message"      rewrite Claude's last reply on the note
+//   fa step <id> "what now"     live progress line shown under "Working" in the plugin
 //   fa snapshot <id> before|after <png>   store a before/after screenshot (shown in the plugin)
 //   fa patch <id> <json-file>   store the revert patch so the plugin can Undo (see CLAUDE.md)
 //   fa focus <id> <json-file>   layers to select in Figma (JSON array of node ids); the plugin shows a Select button
@@ -33,7 +34,7 @@ const batchLabel = it => (it.batchId ? ` [batch ${it.batchId}${it.batchMode === 
   + (it.mentions?.length ? ` [@ ${it.mentions.map(m => m.name).join(', ')}]` : '')
   + (it.library ? ` [library ${it.library}]` : '')
   + (it.useComments ? ' [use comments]' : '');
-const nodesLabel = it => it.nodes.map(n => n.region ? `area ${n.w}×${n.h} in "${n.region.frameName || 'page'}"` : `${n.name} (${n.id})`).join(', ') || `whole page "${it.pageName || '?'}"`;
+const nodesLabel = it => it.scope === 'file' ? `whole file "${it.fileName || '?'}"` : it.nodes.map(n => n.region ? `area ${n.w}×${n.h} in "${n.region.frameName || 'page'}"` : `${n.name} (${n.id})`).join(', ') || `whole page "${it.pageName || '?'}"`;
 
 async function main() {
   const [cmd, a, ...rest] = process.argv.slice(2);
@@ -82,6 +83,12 @@ async function main() {
       await api(`/annotations/${a}/messages`, { method: 'POST', body: { from: 'claude', text, status, replaceLast: cmd === 'edit' } });
       return console.log(`#${a} ${cmd === 'edit' ? 'reply rewritten' : status || 'replied'}`);
     }
+    case 'step': {
+      const text = rest.join(' ');
+      if (!text) throw new Error('usage: fa step <id> "what you are doing"');
+      await api(`/annotations/${a}/progress`, { method: 'POST', body: { text } });
+      return console.log(`#${a} step: ${oneLine(text)}`);
+    }
     case 'comments': {
       if (!a) throw new Error('usage: fa comments <fileKey|note id> [--all]');
       const key = /^\d+$/.test(a) ? (await api(`/annotations/${a}`)).fileKey : a;
@@ -118,7 +125,7 @@ async function main() {
       }
     }
     default:
-      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|edit|comments|watch');
+      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|edit|step|comments|watch');
   }
 }
 

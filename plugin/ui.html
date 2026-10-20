@@ -99,6 +99,17 @@
   .msg.system { padding: 0; background: none; color: var(--text2); font-style: italic; }
   .msg small { display: block; font-size: 10px; color: var(--text2); margin-bottom: 1px; }
   .msg.claude { white-space: normal; }
+  .prog { font-size: 11px; color: var(--text2); display: grid; gap: 2px; }
+  .prog .done { padding-left: 14px; position: relative; overflow-wrap: anywhere; }
+  .prog .done::before { content: '✓'; position: absolute; left: 0; color: var(--text3); }
+  .prog .now { padding-left: 14px; position: relative; color: var(--text); overflow-wrap: anywhere; }
+  .prog .now::before { content: ''; position: absolute; left: 3px; top: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); animation: pulse 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .prog .now::before { animation: none; } }
+  .prog summary { cursor: pointer; list-style: none; width: fit-content; }
+  .prog summary::-webkit-details-marker { display: none; }
+  .prog summary::after { content: ' ▸'; }
+  .prog[open] summary::after { content: ' ▾'; }
+  .prog[open] summary { margin-bottom: 2px; }
   .msg.claude p { margin: 0; }
   .msg.claude p + p, .msg.claude p + ul, .msg.claude ul + p { margin-top: 6px; }
   .msg.claude ul { margin: 4px 0 0; padding-left: 14px; }
@@ -247,6 +258,10 @@
 
 <footer class="composer" id="composer">
   <div class="pop opts" id="opts" hidden>
+    <div class="orow">
+      <span class="lbl" title="Whole file: Claude looks at every page, not only the selection or this page">Applies to</span>
+      <div class="seg" id="scope"><button data-v="sel" class="on" type="button">Selection</button><button data-v="file" type="button">Whole file</button></div>
+    </div>
     <div class="orow">
       <span class="lbl" title="Claude makes this many different directions side by side and leaves the original as it is">Versions</span>
       <div class="seg" id="variations"><button data-v="1" class="on" type="button">1</button><button data-v="2" type="button">2</button><button data-v="3" type="button">3</button><button data-v="4" type="button">4</button></div>
@@ -399,7 +414,10 @@ function renderTarget() {
   if (thumbUrl) URL.revokeObjectURL(thumbUrl);
   thumbUrl = sel.image ? URL.createObjectURL(new Blob([sel.image], { type: 'image/png' })) : null;
   $('thumb').style.backgroundImage = thumbUrl ? `url(${thumbUrl})` : '';
-  if (!sel.nodes.length) {
+  if (wholeFile()) {
+    $('tName').textContent = 'Whole file';
+    $('tMeta').textContent = `Every page of ${ctx.fileName ? '“' + ctx.fileName + '”' : 'this file'}.`;
+  } else if (!sel.nodes.length) {
     $('tName').textContent = targets.length ? `${targets.length} added` : 'Nothing selected';
     $('tMeta').textContent = targets.length ? 'Select more to add them too.' : `The note is about the page${ctx.pageName ? ' “' + ctx.pageName + '”' : ''}.`;
   } else if (selectionIsArea()) {
@@ -684,11 +702,15 @@ function seg(id) {
   return () => root.querySelector('.on').dataset.v;
 }
 const getVariations = seg('variations');
+seg('scope');
+// read from the button itself, so it also works for code that runs before this line
+function wholeFile() { return $('scope').querySelector('.on')?.dataset.v === 'file'; }
 
 const toNode = t => ({ id: t.id, name: t.name, type: t.type, w: t.w, h: t.h, page: t.page, pageId: t.pageId, region: t.region, image: t.image ? toBase64(t.image) : null });
 
 // the targets the designer added; if none, whatever is selected right now (a pending area box counts)
 async function gatherNodes() {
+  if (wholeFile()) return [];
   if (selectionIsArea()) await requestTargets();
   if (targets.length) return targets.map(toNode);
   return sel.nodes.map((n, i) => ({ ...n, page: ctx.pageName, image: i === 0 && sel.image ? toBase64(sel.image) : null }));
@@ -703,6 +725,7 @@ async function currentDraft() {
     library: $('library').value || null,
     variations: Number(getVariations()),
     useComments: $('useComments').checked,
+    scope: wholeFile() ? 'file' : null,
     attachments: files.map(p => ({ name: p.name, mime: p.mime, data: p.data })),
   };
 }
@@ -715,6 +738,7 @@ async function postNote(body) {
 function resetComposer() {
   $('note').value = ''; mentions = []; hideMentions(); clearFiles(); clearTargets();
   $('variations').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === '1'));
+  $('scope').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === 'sel'));
   $('useComments').checked = false;
   $('urgent').checked = false;
   optionsSummary(); renderTarget();
@@ -731,7 +755,7 @@ document.addEventListener('mousedown', e => { if (!$('opts').hidden && !e.target
 // a non-default option shows under the note, so a closed menu never hides a choice
 function optionsSummary() {
   const v = getVariations();
-  const on = [v !== '1' ? v + ' versions' : '', $('library').value ? ($('library').value === 'local' ? 'this file only' : $('library').value) : '',
+  const on = [wholeFile() ? 'whole file' : '', v !== '1' ? v + ' versions' : '', $('library').value ? ($('library').value === 'local' ? 'this file only' : $('library').value) : '',
     $('useComments').checked ? 'Figma comments' : '', $('urgent').checked ? 'urgent' : ''].filter(Boolean);
   $('optsBadge').hidden = !on.length;
   $('optLine').hidden = !on.length;
@@ -740,6 +764,7 @@ function optionsSummary() {
 }
 ['library', 'useComments', 'urgent'].forEach(id => $(id).addEventListener('change', optionsSummary));
 $('variations').addEventListener('click', () => setTimeout(optionsSummary));
+$('scope').addEventListener('click', () => setTimeout(() => { optionsSummary(); renderTarget(); }));
 
 async function submit() {
   if ($('send').disabled) return;
@@ -761,7 +786,8 @@ async function addToBatch() {
   renderDrafts();
   updateSend();
 }
-const nodeLabel = nodes => {
+const nodeLabel = (nodes, scope) => {
+  if (scope === 'file') return 'Whole file';
   if (!nodes.length) return 'Whole page';
   const names = nodes.slice(0, 2).map(n => n.type === 'AREA' ? 'Area' : n.name);
   return names.join(', ') + (nodes.length > 2 ? ` +${nodes.length - 2}` : '');
@@ -770,7 +796,7 @@ function renderDrafts() {
   $('batch').hidden = !drafts.length;
   $('batchTitle').textContent = `${drafts.length} note${drafts.length === 1 ? '' : 's'} in batch`;
   $('drafts').innerHTML = drafts.map((d, i) =>
-    `<div class="draft"><span class="muted">${i + 1}.</span><span class="t" title="${esc(d.note)}">${esc(nodeLabel(d.nodes))}: ${esc(d.note)}${d.attachments.length ? ` (+${d.attachments.length})` : ''}</span><button class="x" type="button" data-rm="${i}" title="Remove">${ICON.x}</button></div>`).join('');
+    `<div class="draft"><span class="muted">${i + 1}.</span><span class="t" title="${esc(d.note)}">${esc(nodeLabel(d.nodes, d.scope))}: ${esc(d.note)}${d.attachments.length ? ` (+${d.attachments.length})` : ''}</span><button class="x" type="button" data-rm="${i}" title="Remove">${ICON.x}</button></div>`).join('');
 }
 $('drafts').addEventListener('click', e => {
   const rm = e.target.closest('[data-rm]'); if (!rm) return;
@@ -971,10 +997,14 @@ function itemHtml(it) {
   const replyOpen = !it.reverted && (it.status === 'question' || openReplies.has(it.id) || replyDrafts[it.id]);
   const placeholder = { question: 'Answer Claude…', done: 'Not quite right? Say why…', working: 'Add something while Claude works…', pending: 'Add to this note…' }[it.status];
   const st = it.reverted ? 'reverted' : it.status;
+  const steps = it.progress || [];
+  const progress = !steps.length ? ''
+    : it.status === 'working' ? `<div class="prog">${steps.slice(0, -1).slice(-3).map(p => `<div class="done">${esc(p.text)}</div>`).join('')}<div class="now">${esc(steps.at(-1).text)}</div></div>`
+    : `<details class="prog"><summary>${steps.length} step${steps.length > 1 ? 's' : ''}</summary>${steps.map(p => `<div class="done">${esc(p.text)}</div>`).join('')}</details>`;
   return `<article class="item${it.id === hitId ? ' hit' : ''}" data-id="${it.id}">
-    <div class="top"><span class="who" title="${esc(nodeLabel(it.nodes))}">#${it.id} · ${esc(nodeLabel(it.nodes))}${it.batchId ? ' · batch' : ''}</span><span class="st ${st}">${it.reverted ? 'Reverted' : LABEL[it.status]}</span></div>
+    <div class="top"><span class="who" title="${esc(nodeLabel(it.nodes, it.scope))}">#${it.id} · ${esc(nodeLabel(it.nodes, it.scope))}${it.batchId ? ' · batch' : ''}</span><span class="st ${st}">${it.reverted ? 'Reverted' : LABEL[it.status]}</span></div>
     <div class="you">${esc(it.note)}</div>
-    ${meta ? `<div class="meta">${esc(meta)}</div>` : ''}${mediaHtml(it)}${thread}
+    ${meta ? `<div class="meta">${esc(meta)}</div>` : ''}${mediaHtml(it)}${thread}${progress}
     ${showCmp ? `<div class="cmp"><figure><div class="img" data-img="${it.id}:before" ${imgStyle(it, 'before')}></div><figcaption>Before</figcaption></figure><figure><div class="img" data-img="${it.id}:after" ${imgStyle(it, 'after')}></div><figcaption>After</figcaption></figure></div>` : ''}
     ${replyOpen ? `<div class="reply"><input class="replyInput" type="text" data-id="${it.id}" value="${esc(replyDrafts[it.id] || '')}" placeholder="${placeholder}"></div>` : ''}
     <div class="acts">
@@ -988,7 +1018,7 @@ function itemHtml(it) {
 }
 
 // only the notes that changed are redrawn, so scrolling, typing and pictures stay put
-const itemSig = it => JSON.stringify([it.updatedAt, it.status, it.thread.length, it.reverted, (it.focus || []).length, !!it.patch, it.hasBefore, it.hasAfter, openReplies.has(it.id), !!replyDrafts[it.id]]);
+const itemSig = it => JSON.stringify([it.updatedAt, it.status, it.thread.length, (it.progress || []).length, it.reverted, (it.focus || []).length, !!it.patch, it.hasBefore, it.hasAfter, openReplies.has(it.id), !!replyDrafts[it.id]]);
 function renderList() {
   const list = $('list');
   if (!items.length) {
