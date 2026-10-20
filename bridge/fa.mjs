@@ -6,6 +6,7 @@
 //   fa done <id> "message"      reply and mark done
 //   fa ask <id> "question"      reply and mark as needing the user's answer
 //   fa say <id> "message"       reply without changing status
+//   fa edit <id> "message"      rewrite Claude's last reply on the note
 //   fa snapshot <id> before|after <png>   store a before/after screenshot (shown in the plugin)
 //   fa patch <id> <json-file>   store the revert patch so the plugin can Undo (see CLAUDE.md)
 //   fa focus <id> <json-file>   layers to select in Figma (JSON array of node ids); the plugin shows a Select button
@@ -73,12 +74,13 @@ async function main() {
       return console.log(`#${a} working`);
     case 'done':
     case 'ask':
-    case 'say': {
+    case 'say':
+    case 'edit': {
       const text = rest.join(' ');
       if (!text) throw new Error('message required');
       const status = cmd === 'done' ? 'done' : cmd === 'ask' ? 'question' : undefined;
-      await api(`/annotations/${a}/messages`, { method: 'POST', body: { from: 'claude', text, status } });
-      return console.log(`#${a} ${status || 'replied'}`);
+      await api(`/annotations/${a}/messages`, { method: 'POST', body: { from: 'claude', text, status, replaceLast: cmd === 'edit' } });
+      return console.log(`#${a} ${cmd === 'edit' ? 'reply rewritten' : status || 'replied'}`);
     }
     case 'comments': {
       if (!a) throw new Error('usage: fa comments <fileKey|note id> [--all]');
@@ -116,7 +118,7 @@ async function main() {
       }
     }
     default:
-      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|comments|watch');
+      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|edit|comments|watch');
   }
 }
 

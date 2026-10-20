@@ -240,7 +240,10 @@ const server = http.createServer(async (req, res) => {
         const b = await readBody(req);
         const from = b.from === 'claude' ? 'claude' : 'user';
         if (!b.text || !String(b.text).trim()) return send(res, 400, { error: 'text required' });
-        it.thread.push({ from, text: String(b.text).trim(), at: now() });
+        // Claude can rewrite its own last reply instead of adding another one
+        const prev = from === 'claude' && b.replaceLast ? it.thread.findLast(t => t.from === 'claude') : null;
+        if (prev) prev.text = String(b.text).trim();
+        else it.thread.push({ from, text: String(b.text).trim(), at: now() });
         // a user message is unread until Claude answers; it re-opens a finished item, and reaches Claude mid-work too
         if (from === 'user') {
           it.unread = true;

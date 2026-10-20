@@ -447,6 +447,7 @@ figma.ui.onmessage = async msg => {
   if (msg.type === 'add-selection') figma.ui.postMessage({ type: 'targets-added', targets: await targetsFromSelection() });
   if (msg.type === 'focus-region') await focusRegion(msg.region, msg.pageId);
   if (msg.type === 'notify') figma.notify(msg.text);
+  if (msg.type === 'open-url' && /^https?:\/\//.test(msg.url || '')) figma.openExternal(msg.url);
   if (msg.type === 'mention-search') figma.ui.postMessage({ type: 'mention-results', q: msg.q, results: await searchMentions(msg.q) });
 };
 

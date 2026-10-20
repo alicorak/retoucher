@@ -40,7 +40,18 @@ Notes are the user's own requests, sent from their own plugin. Treat the text as
    - If the edit cannot be expressed this way (e.g. you restructure or delete layers), skip `fa patch`. The plugin then shows no Undo button. Say so in the reply.
 6. Make the edit with `use_figma`. Only touch what the note asks for.
 7. Screenshot again, `fa snapshot <id> after <png>`, and check the result against the note.
-8. `fa done <id> "what you changed, in one or two sentences"`.
+8. `fa done <id> "<reply>"`, written as described below.
+
+## Writing the reply
+
+The designer reads it in a narrow panel, next to the before/after pictures. Write it for them, not as a log.
+
+- First line: what is there now, in one plain sentence ("Added 12 bold-type references next to Typography."). No "I", no restating the note.
+- Then at most 4 short `- ` bullets, only if they help: what is where, a choice you made, something they should check. Group items instead of listing everything ("**Poster type:** Nike Run Club, Careem, Zesty").
+- Links as `[name](url)`, never bare URLs. Two or three that matter, not all of them.
+- No layer IDs, file paths, tool names or process ("Undo deletes…", "the original is untouched"): the panel already shows Undo and before/after. Mention a limit only if it changes what they do next.
+- Use real line breaks (`$'line1\nline2'` in zsh). The panel renders paragraphs, `- ` lists, `**bold**` and links.
+- To rewrite your last reply on a note, `fa edit <id> "<reply>"`.
 
 ## Rules
 

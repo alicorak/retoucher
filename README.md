@@ -109,6 +109,7 @@ Tip: select the specific layer you mean. A selection that covers a whole row of 
 | `done <id> "msg"` | Reply and mark done |
 | `ask <id> "question"` | Reply and ask the user something |
 | `say <id> "msg"` | Reply without changing status |
+| `edit <id> "msg"` | Rewrite Claude's last reply on the note |
 | `snapshot <id> before\|after <png>` | Store a before/after screenshot shown in the panel |
 | `patch <id> <json>` | Store the revert patch behind the Undo button |
 | `focus <id> <json>` | Layers to select; the panel shows a *Select N layers* button |

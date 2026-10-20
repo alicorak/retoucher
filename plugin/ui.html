@@ -98,6 +98,14 @@
   .msg.claude { background: var(--brand-soft); }
   .msg.system { padding: 0; background: none; color: var(--text2); font-style: italic; }
   .msg small { display: block; font-size: 10px; color: var(--text2); margin-bottom: 1px; }
+  .msg.claude { white-space: normal; }
+  .msg.claude p { margin: 0; }
+  .msg.claude p + p, .msg.claude p + ul, .msg.claude ul + p { margin-top: 6px; }
+  .msg.claude ul { margin: 4px 0 0; padding-left: 14px; }
+  .msg.claude li + li { margin-top: 2px; }
+  .msg.claude b { font-weight: 600; }
+  .msg a { color: var(--brand); text-decoration: none; cursor: pointer; }
+  .msg a:hover { text-decoration: underline; }
   .media { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; min-width: 0; }
   .ph { width: 48px; height: 48px; flex: none; border-radius: 4px; border: 1px solid var(--line); background: var(--bg2) center/cover no-repeat; }
   .ph.sm { width: 36px; height: 36px; background-size: contain; }
@@ -319,6 +327,43 @@ const $ = id => document.getElementById(id);
 const post = m => parent.postMessage({ pluginMessage: m }, '*');
 const notify = text => post({ type: 'notify', text });
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// Claude's replies: paragraphs, "- " lists, **bold**, [label](url) and bare links (opened in the browser).
+const INLINE = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*\n]+)\*\*|((?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}\/[^\s)]*|https?:\/\/[^\s)]+)/gi;
+function linkLabel(url) {
+  const u = url.replace(/^https?:\/\//, '').replace(/^www\./, '');
+  const [host, ...path] = u.split('/');
+  return path.join('/').length > 12 ? `${host}/${path[0]}/…` : u;
+}
+function inlineText(raw) {
+  let out = '', last = 0, m;
+  INLINE.lastIndex = 0;
+  while ((m = INLINE.exec(raw))) {
+    let [all, label, href, bold, bare] = m;
+    let tail = '';
+    if (bare) { const t = bare.match(/[.,;:!?]+$/); if (t) { tail = t[0]; bare = bare.slice(0, -tail.length); } }
+    out += esc(raw.slice(last, m.index));
+    if (bold) out += `<b>${esc(bold)}</b>`;
+    else {
+      const url = href || (/^https?:/i.test(bare) ? bare : 'https://' + bare);
+      out += `<a data-href="${esc(url)}" title="${esc(url)}">${esc(label || linkLabel(bare))}</a>${esc(tail)}`;
+    }
+    last = m.index + all.length;
+  }
+  return out + esc(raw.slice(last));
+}
+function richText(text) {
+  const blocks = [];
+  for (const line of String(text).split('\n')) {
+    const li = line.match(/^\s*[-•]\s+(.*)$/);
+    const prev = blocks.at(-1);
+    if (li) prev && prev.type === 'ul' ? prev.lines.push(li[1]) : blocks.push({ type: 'ul', lines: [li[1]] });
+    else if (!line.trim()) blocks.push({ type: 'gap' });
+    else prev && prev.type === 'p' ? prev.lines.push(line) : blocks.push({ type: 'p', lines: [line] });
+  }
+  return blocks.map(b => b.type === 'ul' ? `<ul>${b.lines.map(l => `<li>${inlineText(l)}</li>`).join('')}</ul>`
+    : b.type === 'p' ? `<p>${b.lines.map(inlineText).join('<br>')}</p>` : '').join('');
+}
 
 function fileKeyFromUrl(u) {
   const m = /figma\.com\/(?:design|file|board)\/([A-Za-z0-9]+)/.exec(u || '');
@@ -918,7 +963,7 @@ function mediaHtml(it) {
 }
 
 function itemHtml(it) {
-  const thread = it.thread.map(t => `<div class="msg ${t.from}">${t.from === 'system' ? '' : `<small>${t.from === 'claude' ? 'Claude' : 'You'}</small>`}${esc(t.text)}</div>`).join('');
+  const thread = it.thread.map(t => `<div class="msg ${t.from}">${t.from === 'system' ? '' : `<small>${t.from === 'claude' ? 'Claude' : 'You'}</small>`}${t.from === 'claude' ? richText(t.text) : esc(t.text)}</div>`).join('');
   const meta = [it.priority === 'urgent' ? 'urgent' : '', it.variations > 1 ? `${it.variations} versions` : '', it.library ? `library: ${it.library === 'local' ? 'this file' : it.library}` : '',
     (it.mentions || []).length ? '@ ' + it.mentions.map(m => m.name).join(', ') : '', it.useComments ? 'uses comments' : '', it.batchMode === 'parallel' ? 'parallel' : ''].filter(Boolean).join(' · ');
   const showCmp = it.status === 'done' && it.hasBefore && it.hasAfter;
@@ -1014,6 +1059,8 @@ function focusNote(it) {
 function redrawItem(id) { const it = items.find(i => i.id === id); const el = document.querySelector(`.item[data-id="${id}"]`); if (it && el) { el.dataset.sig = ''; renderList(); } }
 
 $('list').addEventListener('click', async e => {
+  const link = e.target.closest('a[data-href]');
+  if (link) { e.preventDefault(); e.stopPropagation(); post({ type: 'open-url', url: link.dataset.href }); return; }
   const select = e.target.closest('[data-select]');
   if (select) { const it = items.find(i => i.id === select.dataset.select); if (it && it.focus) post({ type: 'focus', ids: it.focus }); return; }
   const undo = e.target.closest('[data-undo]');
