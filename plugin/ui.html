@@ -99,6 +99,7 @@
   .msg.system { padding: 0; background: none; color: var(--text2); font-style: italic; }
   .msg small { display: block; font-size: 10px; color: var(--text2); margin-bottom: 1px; }
   .msg.claude { white-space: normal; }
+  #fileUrl.bad { outline: 1px solid var(--danger, #f24822); }
   .tokenRow input { flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); color: var(--text); font: inherit; }
   .perms { flex: none; border-top: 1px solid var(--line); background: var(--warn-soft); padding: 10px 12px; display: grid; gap: 10px; max-height: 50vh; overflow: auto; }
   .perm { display: grid; gap: 4px; min-width: 0; }
@@ -251,7 +252,7 @@
 </div>
 
 <div class="banner warn" id="setup" hidden>
-  <div>Figma didn't share this file's key. Paste the file's URL once so Claude knows which file to open.</div>
+  <div><b>Paste this file's link to start.</b> Figma doesn't tell plugins which file is open, so the panel asks once per file (Share → Copy link, or the browser's address bar).</div>
   <input type="text" id="fileUrl" placeholder="https://www.figma.com/design/…">
 </div>
 
@@ -417,8 +418,7 @@ function showSetup() { $('setup').hidden = !!effectiveKey(); }
 window.onmessage = e => {
   const m = e.data && e.data.pluginMessage;
   if (!m) return;
-  if (m.type === 'context') { ctx = m; showSetup(); refresh(true); }
-  if (m.type === 'saved-file-url') { $('fileUrl').value = m.value; showSetup(); refresh(true); }
+  if (m.type === 'context') { ctx = m; showSetup(); updateSend(); refresh(true); }
   if (m.type === 'selection') { sel = m; renderTarget(); highlightFor(m.path || []); if (quickPending) sendQuick(); }
   if (m.type === 'quick-note') { quickPending = m.note; sendQuick(); }
   if (m.type === 'libraries') renderLibraries(m.names || []);
@@ -715,6 +715,7 @@ function onPickerResult(list) {
 function canCompose() { return $('note').value.trim() && effectiveKey(); }
 function updateSend() {
   $('send').disabled = !(online && canCompose());
+  $('send').title = !effectiveKey() ? 'Paste this file’s link above first' : !online ? 'Claude Code isn’t connected' : !$('note').value.trim() ? 'Write a note first' : 'Send (⌘↵)';
   $('queue').disabled = !canCompose();
   $('addSel').disabled = !sel.nodes.length;
   $('batchSend').disabled = !online || !drafts.length;
@@ -936,9 +937,12 @@ function highlightFor(path) {
   if (el) { el.classList.add('hit'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
 }
 $('fileUrl').addEventListener('input', () => {
-  post({ type: 'save-file-url', value: $('fileUrl').value });
-  showSetup();
-  refresh(true);
+  const key = fileKeyFromUrl($('fileUrl').value);
+  $('fileUrl').classList.toggle('bad', !!$('fileUrl').value.trim() && !key);
+  if (!key) return updateSend();
+  post({ type: 'save-file-key', key });
+  ctx.fileKey = key; $('fileUrl').value = '';
+  showSetup(); updateSend(); refresh(true);
 });
 $('markers').addEventListener('change', e => { markersOn = e.target.checked; post({ type: 'set-markers', value: markersOn }); syncMarkers(); });
 

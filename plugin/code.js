@@ -180,10 +180,25 @@ async function pushSelection() {
   });
 }
 
+// Published plugins don't get figma.fileKey. The designer pastes the file's link once; the key is kept in the
+// file itself (plugin data on the document), so it is right for this file and for everyone who opens it, and in
+// this computer's storage under the file's name for view-only files, where the document can't be written.
+const KEY_DATA = 'fa:fileKey';
+const localKeyName = () => 'fileKey:' + figma.root.name;
+let savedKey = null;
+async function loadSavedKey() {
+  savedKey = figma.root.getPluginData(KEY_DATA) || (await figma.clientStorage.getAsync(localKeyName())) || null;
+}
+async function saveKey(key) {
+  savedKey = key || null;
+  try { figma.root.setPluginData(KEY_DATA, key || ''); } catch {}
+  await figma.clientStorage.setAsync(localKeyName(), key || '');
+}
+
 function pushContext() {
   figma.ui.postMessage({
     type: 'context',
-    fileKey: figma.fileKey || null,
+    fileKey: figma.fileKey || savedKey || null,
     fileName: figma.root.name,
     pageName: figma.currentPage.name,
     pageId: figma.currentPage.id,
@@ -405,18 +420,17 @@ async function applyPatch(patch) {
 figma.ui.onmessage = async msg => {
   if (msg.type === 'ready') {
     removeTempAreas();
+    await loadSavedKey();
     pushContext();
     await pushSelection();
     uiReady = true;
     sendQuick();
     libraryNames().then(names => figma.ui.postMessage({ type: 'libraries', names }));
-    const saved = await figma.clientStorage.getAsync('fileUrl');
-    figma.ui.postMessage({ type: 'saved-file-url', value: saved || '' });
     const markers = await figma.clientStorage.getAsync('markers');
     figma.ui.postMessage({ type: 'markers-pref', value: markers !== false });
     figma.ui.postMessage({ type: 'prefs', pairKey: await figma.clientStorage.getAsync('pairKey'), optionsOpen: await figma.clientStorage.getAsync('optionsOpen'), size: await figma.clientStorage.getAsync('size') });
   }
-  if (msg.type === 'save-file-url') await figma.clientStorage.setAsync('fileUrl', msg.value);
+  if (msg.type === 'save-file-key') { await saveKey(msg.key); pushContext(); }
   if (msg.type === 'set-pref' && ['pairKey', 'optionsOpen', 'size'].includes(msg.key)) await figma.clientStorage.setAsync(msg.key, msg.value);
   if (msg.type === 'set-markers') await figma.clientStorage.setAsync('markers', !!msg.value);
   if (msg.type === 'sync-markers') await syncMarkers(msg.items, msg.enabled);
