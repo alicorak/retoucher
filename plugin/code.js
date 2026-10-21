@@ -414,10 +414,10 @@ figma.ui.onmessage = async msg => {
     figma.ui.postMessage({ type: 'saved-file-url', value: saved || '' });
     const markers = await figma.clientStorage.getAsync('markers');
     figma.ui.postMessage({ type: 'markers-pref', value: markers !== false });
-    figma.ui.postMessage({ type: 'prefs', bridgeRoot: await figma.clientStorage.getAsync('bridgeRoot'), optionsOpen: await figma.clientStorage.getAsync('optionsOpen'), size: await figma.clientStorage.getAsync('size') });
+    figma.ui.postMessage({ type: 'prefs', pairKey: await figma.clientStorage.getAsync('pairKey'), optionsOpen: await figma.clientStorage.getAsync('optionsOpen'), size: await figma.clientStorage.getAsync('size') });
   }
   if (msg.type === 'save-file-url') await figma.clientStorage.setAsync('fileUrl', msg.value);
-  if (msg.type === 'set-pref' && ['bridgeRoot', 'optionsOpen', 'size'].includes(msg.key)) await figma.clientStorage.setAsync(msg.key, msg.value);
+  if (msg.type === 'set-pref' && ['pairKey', 'optionsOpen', 'size'].includes(msg.key)) await figma.clientStorage.setAsync(msg.key, msg.value);
   if (msg.type === 'set-markers') await figma.clientStorage.setAsync('markers', !!msg.value);
   if (msg.type === 'sync-markers') await syncMarkers(msg.items, msg.enabled);
   if (msg.type === 'clear-markers') {

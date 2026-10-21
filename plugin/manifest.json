@@ -2,19 +2,28 @@
   "name": "Annotate for Claude",
   "id": "figma-annotate-claude-dev",
   "api": "1.0.0",
-  "editorType": ["figma"],
+  "editorType": [
+    "figma"
+  ],
   "main": "code.js",
   "ui": "ui.html",
-  "enablePrivatePluginApi": true,
   "documentAccess": "dynamic-page",
-  "permissions": ["teamlibrary"],
+  "permissions": [
+    "teamlibrary"
+  ],
   "parameters": [
-    { "name": "Note", "key": "note", "description": "What should change? Sent with the selection", "allowFreeform": true }
+    {
+      "name": "Note",
+      "key": "note",
+      "description": "What should change? Sent with the selection",
+      "allowFreeform": true
+    }
   ],
   "parameterOnly": false,
   "networkAccess": {
-    "allowedDomains": ["none"],
-    "devAllowedDomains": ["http://localhost:4747"],
-    "reasoning": "Sends notes to a local bridge that Claude Code reads."
+    "allowedDomains": [
+      "http://localhost:4747"
+    ],
+    "reasoning": "The plugin only talks to a bridge on your own computer (localhost:4747) that the Annotate for Claude plugin for Claude Code starts. Notes, screenshots and files stay on your machine; nothing is sent to any other server."
   }
 }

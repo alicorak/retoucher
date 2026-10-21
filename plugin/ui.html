@@ -99,6 +99,16 @@
   .msg.system { padding: 0; background: none; color: var(--text2); font-style: italic; }
   .msg small { display: block; font-size: 10px; color: var(--text2); margin-bottom: 1px; }
   .msg.claude { white-space: normal; }
+  .tokenRow input { flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); color: var(--text); font: inherit; }
+  .perms { flex: none; border-top: 1px solid var(--line); background: var(--warn-soft); padding: 10px 12px; display: grid; gap: 10px; max-height: 50vh; overflow: auto; }
+  .perm { display: grid; gap: 4px; min-width: 0; }
+  .perm .ph2 { font-size: 10px; color: var(--text2); }
+  .perm b { font-weight: 600; font-size: 12px; }
+  .perm .sub { font-size: 11px; color: var(--text2); overflow-wrap: anywhere; }
+  .perm pre { margin: 4px 0 0; padding: 6px 8px; max-height: 140px; overflow: auto; background: var(--bg); border-radius: var(--r); font: 10px/1.4 ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .perm details summary { font-size: 11px; color: var(--text2); cursor: pointer; width: fit-content; }
+  .perm .pa { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .perm .pa .grow { flex: 1; }
   .prog { font-size: 11px; color: var(--text2); display: grid; gap: 2px; }
   .prog .done { padding-left: 14px; position: relative; overflow-wrap: anywhere; }
   .prog .done::before { content: '✓'; position: absolute; left: 0; color: var(--text3); }
@@ -256,6 +266,8 @@
   </div>
 </div>
 
+<section class="perms" id="perms" hidden aria-live="polite"></section>
+
 <footer class="composer" id="composer">
   <div class="pop opts" id="opts" hidden>
     <div class="orow">
@@ -270,7 +282,11 @@
       <span class="lbl">Build with</span>
       <select id="library" title="Which design system Claude builds with"><option value="">Any library</option><option value="local">This file only</option></select>
     </div>
-    <label class="tog" title="Claude reads the Figma comments on these layers (needs a Figma token on the bridge)"><input type="checkbox" id="useComments"> Use Figma comments</label>
+    <label class="tog" title="Claude reads the Figma comments on these layers (needs a Figma token)"><input type="checkbox" id="useComments"> Use Figma comments</label>
+    <div class="orow tokenRow" id="tokenRow" hidden>
+      <input id="figmaToken" type="password" placeholder="Figma token (figd_…)" autocomplete="off" spellcheck="false" title="Figma → Settings → Security → Personal access tokens, scope File comments: read. Stays on your computer.">
+      <button class="btn ghost sm" id="tokenSave" type="button">Save</button>
+    </div>
     <label class="tog"><input type="checkbox" id="urgent"> Urgent</label>
     <label class="tog"><input type="checkbox" id="markers" checked> Show markers on canvas</label>
   </div>
@@ -309,6 +325,17 @@
 
 <script>
 const BRIDGE = 'http://localhost:4747';
+// every call carries this panel's pairing key (see bridge/server.mjs); the first panel to connect pairs the bridge
+let pairKey = null, pairWaiters = [];
+const keyReady = new Promise(r => pairWaiters.push(r));
+function setPairKey(k) {
+  if (!k) { k = [...crypto.getRandomValues(new Uint8Array(20))].map(b => b.toString(16).padStart(2, '0')).join(''); post({ type: 'set-pref', key: 'pairKey', value: k }); }
+  pairKey = k; pairWaiters.forEach(r => r()); pairWaiters = [];
+}
+async function api(path, opts = {}) {
+  await keyReady;
+  return fetch(BRIDGE + path, { ...opts, headers: { ...(opts.headers || {}), 'X-Annotate-Key': pairKey } });
+}
 const AREA_NAME = '✎ Annotate area (temp)';
 const SVG = p => `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
 const ICON = {
@@ -396,7 +423,7 @@ window.onmessage = e => {
   if (m.type === 'quick-note') { quickPending = m.note; sendQuick(); }
   if (m.type === 'libraries') renderLibraries(m.names || []);
   if (m.type === 'prefs') {
-    if (m.bridgeRoot) { bridgeRoot = m.bridgeRoot; renderHelp(); }
+    setPairKey(m.pairKey);
     if (m.size && m.size.w && m.size.h) normalSize = { w: m.size.w, h: m.size.h };
   }
   if (m.type === 'mention-results') showMentions(m.q, m.results || []);
@@ -731,7 +758,7 @@ async function currentDraft() {
 }
 
 async function postNote(body) {
-  const r = await fetch(BRIDGE + '/annotations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const r = await api('/annotations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!r.ok) throw new Error((await r.json()).error);
 }
 // versions and comments are per note; the library choice stays
@@ -918,43 +945,92 @@ $('markers').addEventListener('change', e => { markersOn = e.target.checked; pos
 // ---------- the notes ----------
 async function refresh(force) {
   try {
+    let h = await (await api('/health?panel=1')).json();
+    if (!h.paired && h.canPair && (await api('/pair', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: pairKey }) })).ok) h = await (await api('/health?panel=1')).json();
+    if (!h.paired) { perms = []; renderPerms(); return setOnline(true, false, true); }
     const key = effectiveKey();
-    const r = await fetch(BRIDGE + '/annotations' + (key ? `?fileKey=${key}` : ''));
+    const r = await api('/annotations' + (key ? `?fileKey=${key}` : ''));
     items = await r.json(); // oldest first, like a chat
-    const h = await (await fetch(BRIDGE + '/health')).json();
-    if (h.root && h.root !== bridgeRoot) { bridgeRoot = h.root; post({ type: 'set-pref', key: 'bridgeRoot', value: h.root }); }
+    perms = await (await api('/permissions?status=pending')).json();
+    renderPerms();
     setOnline(true, !!h.claude);
+    hasCommentsToken = !!h.comments; showTokenRow();
     const sig = JSON.stringify(items);
     if (force || sig !== lastSig) { lastSig = sig; renderList(); syncMarkers(); }
   } catch { setOnline(false); }
 }
+
+// ---------- Figma token for comments: asked for only when "Use Figma comments" is on and the bridge has none ----------
+let hasCommentsToken = true;
+function showTokenRow() { $('tokenRow').hidden = hasCommentsToken || !$('useComments').checked; }
+$('useComments').addEventListener('change', showTokenRow);
+$('tokenSave').onclick = async () => {
+  const r = await api('/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ figmaToken: $('figmaToken').value }) }).catch(() => null);
+  const j = r ? await r.json() : { error: 'bridge off' };
+  if (j.error) return notify(j.error);
+  $('figmaToken').value = ''; hasCommentsToken = !!j.comments; showTokenRow(); notify('Token saved on this computer');
+};
+
+// ---------- permission prompts from Claude Code (bridge/permission-hook.mjs) ----------
+let perms = [], permSig = '';
+function renderPerms() {
+  const sig = perms.map(p => p.id).join();
+  if (sig === permSig) return;
+  const fresh = perms.some(p => !permSig.split(',').includes(p.id));
+  permSig = sig;
+  const box = $('perms');
+  box.hidden = !perms.length;
+  box.innerHTML = perms.map(p => `<div class="perm" data-perm="${p.id}">
+    <span class="ph2">${p.noteId ? `Note #${esc(p.noteId)} · ` : ''}Claude asks for permission</span>
+    <b>${esc(p.title)}</b>
+    ${p.sub ? `<span class="sub">${esc(p.sub)}</span>` : ''}
+    ${p.detail ? `<details><summary>Details</summary><pre>${esc(p.detail)}</pre></details>` : ''}
+    <div class="pa">
+      <button class="btn ghost sm" type="button" data-decide="deny">Decline</button>
+      <span class="grow"></span>
+      <button class="btn ghost sm" type="button" data-decide="always" title="${esc('Don\'t ask again for ' + (p.rule || 'this'))}">Always allow</button>
+      <button class="btn primary sm" type="button" data-decide="once">Allow once</button>
+    </div>
+  </div>`).join('');
+  if (fresh) notify('Claude needs your permission');
+}
+$('perms').addEventListener('click', async e => {
+  const b = e.target.closest('[data-decide]'); if (!b) return;
+  const id = b.closest('[data-perm]').dataset.perm;
+  b.closest('.perm').querySelectorAll('button').forEach(x => (x.disabled = true));
+  try {
+    await api(`/permissions/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: b.dataset.decide }) });
+  } catch { notify('Could not answer: bridge off'); }
+  perms = perms.filter(p => p.id !== id); renderPerms();
+});
 
 function syncMarkers() {
   post({ type: 'sync-markers', enabled: markersOn, items: items.map(it => ({ id: it.id, status: it.status, note: it.note, nodeIds: it.nodes.filter(n => n.type !== 'AREA').map(n => n.id) })) });
 }
 
 // three states: bridge off / bridge on but no Claude watching / Claude ready
-let bridgeRoot = '', connState = '', helpOpen = null;
-function setOnline(v, claude) {
-  online = v;
-  const state = !v ? 'off' : claude ? 'ready' : 'idle';
+let connState = '', helpOpen = null;
+function setOnline(v, claude, unpaired) {
+  online = v && !unpaired;
+  const state = !v ? 'off' : unpaired ? 'unpaired' : claude ? 'ready' : 'idle';
   if (state !== connState) {
     connState = state;
     $('dot').className = 'dot' + (state === 'ready' ? ' on' : state === 'idle' ? ' wait' : '');
-    $('connText').textContent = { off: 'Bridge off', idle: 'Not watching', ready: 'Claude ready' }[state];
+    $('connText').textContent = { off: 'Not connected', unpaired: 'Not paired', idle: 'Not watching', ready: 'Claude ready' }[state];
     helpOpen = state !== 'ready';
     renderHelp();
   }
   updateSend();
   if (v && quickPending) sendQuick();
 }
-const shq = p => "'" + p.replace(/'/g, "'\\''") + "'";
 function renderHelp() {
   const h = {
-    off: { text: '<b>The bridge isn’t running.</b> It connects this panel to Claude Code. Install it once and it runs in the background from then on:',
-      cmd: bridgeRoot ? `cd ${shq(bridgeRoot)} && ./install.sh` : './install.sh', note: bridgeRoot ? 'Paste it in Terminal.' : 'Run it in Terminal, inside the figma-annotate folder.' },
-    idle: { text: '<b>Claude isn’t watching yet.</b> You can still send notes; they wait here. To start, type this in Claude Code, opened in the figma-annotate folder:',
-      cmd: '/watch-notes', note: '' },
+    off: { text: '<b>Claude Code isn’t connected.</b> Open Claude Code in any folder; it connects by itself. First time? Install the Claude Code plugin once:',
+      cmd: 'claude plugin install figma-annotate --marketplace alicorak/figma-annotate', note: 'Paste it in Terminal, then open Claude Code. In the Claude app: + → Plugins works too.' },
+    unpaired: { text: '<b>This panel isn’t paired.</b> Claude Code is paired with another Figma panel. To pair this one instead, ask Claude Code to “reset the Annotate for Claude pairing”, or run:',
+      cmd: 'fa unpair', note: 'Only you can do this: the pairing keeps websites from reaching your notes.' },
+    idle: { text: '<b>Claude isn’t watching yet.</b> You can still send notes; they wait here. To start, type this in Claude Code:',
+      cmd: '/figma-annotate:watch', note: '' },
     ready: { text: '<b>Claude is watching.</b> Notes are picked up as soon as you send them.', cmd: '', note: '' },
   }[connState];
   if (!h) return;
@@ -1059,7 +1135,7 @@ async function loadImages() {
       const key = imgKey(it, kind);
       if (imgCache.has(key)) continue;
       try {
-        const r = await fetch(`${BRIDGE}/annotations/${it.id}/image/${kind}`);
+        const r = await api(`/annotations/${it.id}/image/${kind}`);
         if (!r.ok) continue;
         const url = URL.createObjectURL(await r.blob());
         imgCache.set(key, url);
@@ -1074,7 +1150,7 @@ async function loadImages() {
 function onPatchResult(m) {
   const r = m.result;
   const problems = r.missing.length + r.errors.length;
-  fetch(`${BRIDGE}/annotations/${m.id}/reverted`, { method: 'POST' }).then(() => refresh(true));
+  api(`/annotations/${m.id}/reverted`, { method: 'POST' }).then(() => refresh(true));
   notify(problems ? `Reverted with ${problems} problem(s): layers missing or locked` : 'Change reverted');
 }
 
@@ -1105,7 +1181,7 @@ $('list').addEventListener('click', async e => {
   if (del) {
     const it = items.find(i => i.id === del.dataset.del);
     if (it) post({ type: 'clear-markers', id: it.id, nodeIds: it.nodes.filter(n => n.type !== 'AREA').map(n => n.id) });
-    await fetch(`${BRIDGE}/annotations/${del.dataset.del}`, { method: 'DELETE' });
+    await api(`/annotations/${del.dataset.del}`, { method: 'DELETE' });
     return refresh(true);
   }
   if (e.target.closest('.reply')) return;
@@ -1127,7 +1203,7 @@ $('list').addEventListener('keydown', async e => {
   if (e.key !== 'Enter') return;
   const text = e.target.value.trim();
   if (!text) return;
-  await fetch(`${BRIDGE}/annotations/${id}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'user', text }) });
+  await api(`/annotations/${id}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'user', text }) });
   delete replyDrafts[id]; openReplies.delete(id);
   e.target.value = '';
   e.target.blur();

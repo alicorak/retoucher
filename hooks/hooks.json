@@ -1,0 +1,28 @@
+{
+  "description": "Starts the local bridge the Figma panel talks to, and asks permission prompts in the panel while Claude works on a note.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bridge/ensure-bridge.mjs\" \"${CLAUDE_PLUGIN_DATA}\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bridge/permission-hook.mjs\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -10,3 +10,4 @@ reports/
 
 # Local experiments on private projects (design-vs-build drift trials)
 drift/
+.claude/settings.local.json

@@ -6,7 +6,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const DATA = path.join(ROOT, 'data');
+// installed as a Claude Code plugin, notes live in the plugin's data folder (FA_DATA), which survives updates
+const DATA = process.env.FA_DATA ? path.resolve(process.env.FA_DATA) : path.join(ROOT, 'data');
+const VERSION = (() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin', 'plugin.json'), 'utf8')).version; } catch { return 'dev'; } })();
 const IMAGES = path.join(DATA, 'images');
 const DB = path.join(DATA, 'annotations.json');
 const PORT = Number(process.env.FA_PORT || 4747);
@@ -22,12 +24,28 @@ function save() {
   fs.renameSync(tmp, DB);
 }
 
+// Pairing: the first Figma panel that connects stores a random key here; after that, every request that comes
+// from a page (it has an Origin header, as the panel's does) must carry it. Websites open in a browser can reach
+// localhost too, and must not read notes, post notes or answer permission prompts. Local processes (Claude Code,
+// the hook, fa) send no Origin and need no key.
+const PAIR = path.join(DATA, 'pair.json');
+const pairKey = () => { try { return JSON.parse(fs.readFileSync(PAIR, 'utf8')).key || null; } catch { return null; } };
+const fromPage = req => req.headers.origin !== undefined;
+const keyOk = req => { const k = pairKey(); return !!k && req.headers['x-annotate-key'] === k; };
+
 const STATUSES = ['pending', 'working', 'question', 'done'];
 // `fa watch` checks in every few seconds; the panel shows "Claude ready" only while it does
 let presence = { at: 0 };
 const LISTENING_MS = 12000;
 const listening = () => Date.now() - presence.at < LISTENING_MS;
-const PATCH_KEYS = ['set', 'remove', 'move', 'swap', 'bind', 'variables'];
+// the panel asks /health?panel=1 every couple of seconds; permission prompts go to it only while it is open
+let panel = { at: 0 };
+const panelOpen = () => Date.now() - panel.at < 8000;
+// Claude Code permission prompts (from bridge/permission-hook.mjs), answered in the panel. Memory only.
+const perms = new Map();
+let permSeq = 0;
+const publicPerm = p => ({ id: p.id, status: p.status, decision: p.decision, title: p.title, sub: p.sub, detail: p.detail, rule: p.rule, noteId: p.noteId, createdAt: p.createdAt });
+const PATCH_KEYS =['set', 'remove', 'move', 'swap', 'bind', 'variables'];
 
 // Figma REST token for reading comments: FIGMA_TOKEN, or { "figmaToken": "..." } in data/config.json
 function figmaToken() {
@@ -82,7 +100,7 @@ function send(res, code, body) {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Annotate-Key',
   });
   res.end(JSON.stringify(body));
 }
@@ -112,7 +130,78 @@ const server = http.createServer(async (req, res) => {
   const parts = url.pathname.split('/').filter(Boolean);
 
   try {
-    if (url.pathname === '/health') return send(res, 200, { ok: true, count: db.items.length, comments: !!figmaToken(), claude: listening(), root: ROOT });
+    if (url.pathname === '/health') {
+      const paired = keyOk(req);
+      if (url.searchParams.get('panel') === '1' && paired) panel = { at: Date.now() };
+      // a page only learns whether it is paired; the rest is for the panel and local tools
+      if (fromPage(req) && !paired) return send(res, 200, { ok: true, paired: false, canPair: !pairKey(), version: VERSION });
+      return send(res, 200, { ok: true, paired, version: VERSION, count: db.items.length, comments: !!figmaToken(), claude: listening(), panel: panelOpen(), root: ROOT });
+    }
+
+    // the panel offers its key once; only the first one is kept (fa unpair resets it)
+    if (req.method === 'POST' && url.pathname === '/pair') {
+      const b = await readBody(req);
+      const key = String(b.key || '');
+      if (!/^[A-Za-z0-9-]{20,80}$/.test(key)) return send(res, 400, { error: 'bad key' });
+      const current = pairKey();
+      if (current && current !== key) return send(res, 409, { error: 'paired with another panel' });
+      if (!current) fs.writeFileSync(PAIR, JSON.stringify({ key, at: now() }), { mode: 0o600 });
+      return send(res, 200, { ok: true });
+    }
+    // local-only housekeeping: forget the pairing, or stop (a newer version is starting)
+    if (req.method === 'POST' && (url.pathname === '/unpair' || url.pathname === '/quit')) {
+      if (fromPage(req)) return send(res, 403, { error: 'local only' });
+      if (url.pathname === '/unpair') { fs.rmSync(PAIR, { force: true }); return send(res, 200, { ok: true }); }
+      send(res, 200, { ok: true });
+      return setTimeout(() => process.exit(0), 50);
+    }
+
+    if (fromPage(req) && !keyOk(req)) return send(res, 401, { error: 'not paired' });
+
+    // the Figma token for reading comments, set from the panel (paired) or locally; kept in the data folder only
+    if (req.method === 'POST' && url.pathname === '/config') {
+      const b = await readBody(req);
+      const token = String(b.figmaToken || '').trim();
+      if (token && !/^figd_[A-Za-z0-9_-]{10,200}$/.test(token)) return send(res, 400, { error: 'that does not look like a Figma token (figd_…)' });
+      let cfg = {};
+      try { cfg = JSON.parse(fs.readFileSync(path.join(DATA, 'config.json'), 'utf8')); } catch {}
+      if (token) cfg.figmaToken = token; else delete cfg.figmaToken;
+      fs.writeFileSync(path.join(DATA, 'config.json'), JSON.stringify(cfg, null, 2), { mode: 0o600 });
+      return send(res, 200, { ok: true, comments: !!figmaToken() });
+    }
+
+    // permission prompts: the hook creates one and waits, the panel answers it
+    if (parts[0] === 'permissions') {
+      for (const [k, p] of perms) if (Date.now() - p.at > 15 * 60 * 1000) perms.delete(k);
+      if (req.method === 'GET' && parts.length === 1) {
+        const status = url.searchParams.get('status');
+        return send(res, 200, [...perms.values()].filter(p => !status || p.status === status).map(publicPerm));
+      }
+      if (req.method === 'POST' && parts.length === 1) {
+        const b = await readBody(req);
+        const s = (v, n) => String(v ?? '').slice(0, n);
+        const p = { id: String(++permSeq), at: Date.now(), createdAt: now(), status: 'pending', decision: null,
+          title: s(b.title, 120), sub: s(b.sub, 300), detail: s(b.detail, 4000), rule: s(b.rule, 200), noteId: b.noteId ? s(b.noteId, 12) : null };
+        perms.set(p.id, p);
+        return send(res, 201, publicPerm(p));
+      }
+      const p = perms.get(parts[1]);
+      if (!p) return send(res, 404, { error: 'not found' });
+      if (req.method === 'GET' && parts.length === 2) return send(res, 200, publicPerm(p));
+      // the panel's answer: once | always | deny
+      if (req.method === 'POST' && parts.length === 2) {
+        const b = await readBody(req);
+        if (!['once', 'always', 'deny'].includes(b.decision)) return send(res, 400, { error: 'decision: once|always|deny' });
+        if (p.status !== 'pending') return send(res, 409, { error: 'already ' + p.status });
+        Object.assign(p, { status: 'answered', decision: b.decision });
+        return send(res, 200, publicPerm(p));
+      }
+      // the hook gave up waiting; the question goes back to the terminal
+      if (req.method === 'POST' && parts[2] === 'expire') {
+        if (p.status === 'pending') p.status = 'expired';
+        return send(res, 200, publicPerm(p));
+      }
+    }
 
     if (req.method === 'POST' && url.pathname === '/presence') {
       presence = { at: Date.now() };
@@ -338,5 +427,5 @@ server.on('error', e => {
   process.exit(1);
 });
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`figma-annotate bridge listening on http://localhost:${PORT}`);
+  console.log(`Annotate for Claude bridge ${VERSION} on http://localhost:${PORT}, data in ${DATA}`);
 });

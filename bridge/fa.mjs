@@ -12,6 +12,7 @@
 //   fa patch <id> <json-file>   store the revert patch so the plugin can Undo (see CLAUDE.md)
 //   fa focus <id> <json-file>   layers to select in Figma (JSON array of node ids); the plugin shows a Select button
 //   fa comments <fileKey|id> [--all]   Figma comment threads of the file (open ones unless --all); needs a token
+//   fa unpair                   forget the paired Figma panel, so another one can pair
 //   fa watch                    print one line per new note, follow-up or message while working (for Monitor)
 import fs from 'node:fs';
 const BASE = `http://localhost:${process.env.FA_PORT || 4747}`;
@@ -89,6 +90,9 @@ async function main() {
       await api(`/annotations/${a}/progress`, { method: 'POST', body: { text } });
       return console.log(`#${a} step: ${oneLine(text)}`);
     }
+    case 'unpair':
+      await api('/unpair', { method: 'POST' });
+      return console.log('Pairing reset. The next Figma panel that opens pairs with this bridge.');
     case 'comments': {
       if (!a) throw new Error('usage: fa comments <fileKey|note id> [--all]');
       const key = /^\d+$/.test(a) ? (await api(`/annotations/${a}`)).fileKey : a;
@@ -125,7 +129,7 @@ async function main() {
       }
     }
     default:
-      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|edit|step|comments|watch');
+      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|edit|step|comments|unpair|watch');
   }
 }
 

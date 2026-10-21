@@ -1,0 +1,18 @@
+{
+  "name": "figma-annotate",
+  "version": "0.2.0",
+  "description": "Leave notes on layers and areas in Figma; Claude Code picks them up, edits the file through the Figma MCP, shows its steps and asks for permissions in the Figma panel.",
+  "author": {
+    "name": "Ali Çorak",
+    "url": "https://github.com/alicorak"
+  },
+  "homepage": "https://github.com/alicorak/figma-annotate",
+  "repository": "https://github.com/alicorak/figma-annotate",
+  "keywords": [
+    "figma",
+    "design",
+    "annotations",
+    "handoff"
+  ],
+  "license": "MIT"
+}
