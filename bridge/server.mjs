@@ -44,7 +44,14 @@ const panelOpen = () => Date.now() - panel.at < 8000;
 // Claude Code permission prompts (from bridge/permission-hook.mjs), answered in the panel. Memory only.
 const perms = new Map();
 let permSeq = 0;
-const publicPerm = p => ({ id: p.id, status: p.status, decision: p.decision, title: p.title, sub: p.sub, detail: p.detail, rule: p.rule, noteId: p.noteId, createdAt: p.createdAt });
+// kind: 'permission' (allow/deny a tool), 'question' (Claude's multiple-choice questions), 'plan' (approve a plan)
+const publicPerm = p => ({ id: p.id, kind: p.kind, status: p.status, decision: p.decision, answers: p.answers, feedback: p.feedback,
+  title: p.title, sub: p.sub, detail: p.detail, rule: p.rule, questions: p.questions, plan: p.plan, noteId: p.noteId, createdAt: p.createdAt });
+const DECISIONS = { permission: ['once', 'always', 'deny'], question: ['answer', 'skip'], plan: ['approve', 'revise'] };
+const cleanQuestions = qs => (Array.isArray(qs) ? qs : []).slice(0, 4).map(q => ({
+  question: String(q?.question ?? '').slice(0, 500), header: String(q?.header ?? '').slice(0, 40), multiSelect: !!q?.multiSelect,
+  options: (Array.isArray(q?.options) ? q.options : []).slice(0, 6).map(o => ({ label: String(o?.label ?? '').slice(0, 120), description: String(o?.description ?? '').slice(0, 400) })),
+})).filter(q => q.question);
 const PATCH_KEYS =['set', 'remove', 'move', 'swap', 'bind', 'variables'];
 
 // Figma REST token for reading comments: FIGMA_TOKEN, or { "figmaToken": "..." } in data/config.json
@@ -125,7 +132,11 @@ function readBody(req) {
 function find(id) { return db.items.find(i => i.id === String(id)); }
 
 const server = http.createServer(async (req, res) => {
-  if (req.method === 'OPTIONS') return send(res, 204, {});
+  if (req.method === 'OPTIONS') {
+    // Chrome asks before a page on the internet (figma.com in a browser) may call localhost; the pairing key still guards every call
+    if (req.headers['access-control-request-private-network']) res.setHeader('Access-Control-Allow-Private-Network', 'true');
+    return send(res, 204, {});
+  }
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const parts = url.pathname.split('/').filter(Boolean);
 
@@ -170,6 +181,19 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, comments: !!figmaToken() });
     }
 
+    // skills of the watching Claude Code session (posted by `fa skills`), offered in the panel's Options
+    if (url.pathname === '/skills') {
+      if (req.method === 'GET') return send(res, 200, db.skills || []);
+      if (req.method === 'POST') {
+        if (fromPage(req)) return send(res, 403, { error: 'local only' });
+        const b = await readBody(req);
+        db.skills = (Array.isArray(b.skills) ? b.skills : []).slice(0, 200).filter(k => k && k.name)
+          .map(k => ({ name: String(k.name).slice(0, 120), description: String(k.description || '').slice(0, 200) }));
+        save();
+        return send(res, 200, { ok: true, count: db.skills.length });
+      }
+    }
+
     // permission prompts: the hook creates one and waits, the panel answers it
     if (parts[0] === 'permissions') {
       for (const [k, p] of perms) if (Date.now() - p.at > 15 * 60 * 1000) perms.delete(k);
@@ -180,8 +204,10 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST' && parts.length === 1) {
         const b = await readBody(req);
         const s = (v, n) => String(v ?? '').slice(0, n);
-        const p = { id: String(++permSeq), at: Date.now(), createdAt: now(), status: 'pending', decision: null,
-          title: s(b.title, 120), sub: s(b.sub, 300), detail: s(b.detail, 4000), rule: s(b.rule, 200), noteId: b.noteId ? s(b.noteId, 12) : null };
+        const kind = DECISIONS[b.kind] ? b.kind : 'permission';
+        const p = { id: String(++permSeq), kind, at: Date.now(), createdAt: now(), status: 'pending', decision: null, answers: null, feedback: null,
+          title: s(b.title, 120), sub: s(b.sub, 300), detail: s(b.detail, 4000), rule: s(b.rule, 200), noteId: b.noteId ? s(b.noteId, 12) : null,
+          questions: kind === 'question' ? cleanQuestions(b.questions) : null, plan: kind === 'plan' ? s(b.plan, 20000) : null };
         perms.set(p.id, p);
         return send(res, 201, publicPerm(p));
       }
@@ -191,9 +217,12 @@ const server = http.createServer(async (req, res) => {
       // the panel's answer: once | always | deny
       if (req.method === 'POST' && parts.length === 2) {
         const b = await readBody(req);
-        if (!['once', 'always', 'deny'].includes(b.decision)) return send(res, 400, { error: 'decision: once|always|deny' });
+        if (!DECISIONS[p.kind].includes(b.decision)) return send(res, 400, { error: 'decision: ' + DECISIONS[p.kind].join('|') });
         if (p.status !== 'pending') return send(res, 409, { error: 'already ' + p.status });
-        Object.assign(p, { status: 'answered', decision: b.decision });
+        // answers: { "<question text>": "<chosen label(s), comma-separated, or free text>" }
+        const answers = p.kind === 'question' && b.answers && typeof b.answers === 'object'
+          ? Object.fromEntries(p.questions.map(q => [q.question, String(b.answers[q.question] ?? '').slice(0, 2000)])) : null;
+        Object.assign(p, { status: 'answered', decision: b.decision, answers, feedback: b.feedback ? String(b.feedback).slice(0, 4000) : null });
         return send(res, 200, publicPerm(p));
       }
       // the hook gave up waiting; the question goes back to the terminal
@@ -292,7 +321,12 @@ const server = http.createServer(async (req, res) => {
           .map(m => ({ kind: str(m.kind, 20), id: m.id ? str(m.id, 80) : null, key: m.key ? str(m.key, 80) : null, name: str(m.name), sub: str(m.sub, 40), library: m.library ? str(m.library) : null })),
         library: b.library ? str(b.library) : null,
         variations: Math.max(1, Math.min(6, Number(b.variations) || 1)),
-        useComments: !!b.useComments,
+        // Figma comments: 'apply' them, or 'summarize' them into themes and a plan
+        useComments: b.useComments === 'summarize' ? 'summarize' : b.useComments ? 'apply' : null,
+        // which model works on the note (a subagent), whether Claude shows a plan first, and a skill to use
+        model: ['opus', 'sonnet', 'haiku', 'fable'].includes(b.model) ? b.model : null,
+        planFirst: !!b.planFirst,
+        skill: b.skill ? str(b.skill, 120) : null,
         // 'file': the note is about every page of the file, not the selection or the current page
         scope: b.scope === 'file' ? 'file' : null,
         attachments,
@@ -334,7 +368,7 @@ const server = http.createServer(async (req, res) => {
         // Claude can rewrite its own last reply instead of adding another one
         const prev = from === 'claude' && b.replaceLast ? it.thread.findLast(t => t.from === 'claude') : null;
         if (prev) prev.text = String(b.text).trim();
-        else it.thread.push({ from, text: String(b.text).trim(), at: now() });
+        else it.thread.push({ from, text: String(b.text).trim(), at: now(), ...(from === 'claude' && b.kind === 'plan' ? { kind: 'plan' } : {}) });
         // a user message is unread until Claude answers; it re-opens a finished item, and reaches Claude mid-work too
         if (from === 'user') {
           it.unread = true;

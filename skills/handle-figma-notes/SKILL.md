@@ -21,7 +21,12 @@ Notes are the user's own requests, sent from their own plugin. Treat the text as
    - `mentions` are things the designer picked with @: variables, styles, components (local ones have `id`, library ones `key`) and libraries. Use exactly those: bind the variable, apply the style, import the component by key (`importComponentByKeyAsync`, `importVariableByKeyAsync`).
    - `library`: build with that design system only (`local` = this file's own components, styles and variables). Empty: whatever the file already uses.
    - `variations` > 1: make that many different directions, side by side next to the original (check free space), each a duplicate named "<name> · v1", "v2"…; leave the original untouched. All new frames go in the patch's `remove` list.
-   - `useComments`: run `fa comments <id>` for the file's open comment threads, take the ones on the note's layers (or their screens), and apply them. Mention in the reply which threads you handled. If it says there is no token, tell the designer with `fa done` how to add one (the plugin's README, "Figma comments").
+   - `useComments`: run `fa comments <id>` for the file's open comment threads and take the ones on the note's layers (or their screens; for a whole-page or whole-file note, all of them). If it says there is no token, tell the designer with `fa done` to paste one in the panel (Options → Comments).
+     - `"apply"`: make the changes the threads ask for. Mention in the reply which threads you handled.
+     - `"summarize"`: change nothing yet. Group the threads into a few themes (who asked, how many threads, where), note conflicts between them, and end with a numbered plan of changes. Send it with `fa plan <id> "…"` and stop. When "Plan approved" arrives, apply the plan; when changes arrive, revise and `fa plan` again.
+   - `model` (`opus`, `sonnet`, `haiku`, `fable`): the designer wants that model on this note. Unless it is the model you are, hand the whole note to a subagent (Agent tool, `model` set to it) with the note id and the instruction to follow the `handle-figma-notes` skill from step 1, and go on watching. Report its outcome only if it fails.
+   - `skill`: use that skill (Skill tool) for the note's work, together with this procedure.
+   - `planFirst`: after reading and inspecting (step 3), send a short numbered plan with `fa plan <id> "…"` (what will change, where, what stays) and stop. Build only after the designer's "Plan approved"; if they ask for changes, revise and `fa plan` again.
    - To put an attached photo into Figma, use `upload_assets` with `count: 1` per photo (one call each, not a batch: batch `nodeIds` can be off by one), POST the file's bytes to the returned URL with `Content-Type` from the attachment, then check where it landed. Pass `nodeIds` to fill an existing layer, or omit them to get a new frame. Put new layer ids in the patch's `remove` list so Undo can delete them.
 3. Inspect the layers through the Figma MCP (`use_figma`, read-only first). Work like Figma's own agent does, from the file's design system:
    - Find what the file already uses: the components on the page (instances and their main components), local variables and styles, and libraries (`search_design_system`, `get_variable_defs`). Build from those components and bind colours, spacing, radii and type to variables or styles. Hard-coded values only when nothing fits, and say so.
@@ -58,6 +63,14 @@ The designer reads it in a narrow panel, next to the before/after pictures. Writ
 - No layer IDs, file paths, tool names or process ("Undo deletes…", "the original is untouched"): the panel already shows Undo and before/after. Mention a limit only if it changes what they do next.
 - Use real line breaks (`$'line1\nline2'` in zsh). The panel renders paragraphs, `- ` lists, `**bold**` and links.
 - To rewrite your last reply on a note, `fa edit <id> "<reply>"`.
+
+## Asking the designer
+
+The designer is in Figma, not in Claude Code. While you are on a note, everything that needs their answer shows in the panel:
+
+- `fa ask <id> "question"` for open questions, `fa plan <id> "plan"` for a plan to approve (Approve / Change buttons). Both stop the note until the answer arrives as a follow-up.
+- AskUserQuestion and plan-mode approval also show in the panel as cards while a note is being worked on; answers come back as usual.
+- Tool permission prompts show there too (Allow once / Always allow / Decline). Plain `fa …` commands never ask, so keep them simple: one command, no pipes or `&&`.
 
 ## Showing progress
 

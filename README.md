@@ -16,7 +16,7 @@ Two parts, installed once:
 
 - [Claude Code](https://claude.com/claude-code) (terminal or the Claude desktop app) with the **Figma MCP server** connected, and edit access to the Figma files you want to change
 - [Node.js](https://nodejs.org) 18 or newer
-- Figma desktop app or browser
+- Figma desktop app or browser (in a browser, allow it to reach your computer if it asks)
 
 ## Install
 
@@ -71,21 +71,23 @@ Tip: select the specific layer you mean. A selection that covers a whole row of 
 - **Design system:** *Any library* / *This file only* / a library name tells Claude what to build with. Claude builds from the file's components and variables, follows a Figma Spec if there is one, and uses hard-coded values only when nothing fits.
 - **Versions:** pick 2–4 and Claude makes that many different directions side by side, leaving the original alone.
 - **Whole page or whole file:** send a note with nothing selected and it is about the page. *Options → Applies to → Whole file* makes it about every page of the file ("all headings above 32 pt in Druk", "dark mode for every screen").
+- **Questions and plans in the panel:** when Claude asks a multiple-choice question or wants a plan approved, it shows as a card in the panel. Pick answers (or write your own) and send, or *Approve plan* / *Change* with a note. Turn on *Options → Show a plan first* to see Claude's plan before anything changes.
+- **Model and skill per note:** *Options → Model* puts Opus, Sonnet, Haiku or Fable on a note (as a helper agent of your session). *Options → Skill* lists the skills of the Claude Code session that is watching.
 - **Permissions in the panel:** when Claude needs permission for a tool while working on a note, the question shows in the panel: *Allow once*, *Always allow* or *Decline*. No need to go back to Claude Code. If the panel is closed, no note is being worked on, or nobody answers within 2 minutes, Claude Code asks in its own window as usual. *Always allow* saves the same rule the terminal's "don't ask again" would. The plugin's own `fa` command (it only talks to the local bridge) runs without asking.
 - **Live progress:** while Claude works, the note shows the step it is on and the last ones it finished. Afterwards they fold into "N steps".
 - **Selecting opens the note:** select a layer on the canvas and the note about it is highlighted in the panel.
-- **Options:** versions, design system, comments, urgent and canvas markers sit behind *Options*. The button shows what is switched on.
+- **Options:** scope, versions, design system, comments, model, skill, plan first, urgent and canvas markers sit behind *Options*. The button shows what is switched on.
 - **Batch:** *Add to batch* (⇧⌘↵) collects several notes, *Send all* delivers them together. Claude handles them in order, or *At the same time* when they don't depend on each other.
 - **Canvas markers:** each open note adds a native Figma annotation ("Claude #3 · Waiting") on its layers. It updates with the status and disappears when the note is done or deleted. Toggle with *Show markers on canvas*. Other people's annotations are never touched.
 - **Several targets:** *Add selection* collects layers and frames, on any page, into the note. Each keeps its own screenshot. Nothing added: the current selection is used.
 - **Areas:** select a frame (or nothing, for what is on screen) and press *Mark area*. A big picture opens in the panel: drag to mark an area, click to drop a pin, then *Add*. Claude gets each area's crop, its position, the screen it sits in and the layer underneath, like a pinned Figma comment.
-- **Figma comments:** tick *Use Figma comments* and Claude reads the open comment threads on those layers and applies them (needs a Figma token, see below).
+- **Figma comments:** *Options → Comments → Apply* makes the changes the open comment threads on those layers ask for. *Summarize* groups them into themes, flags conflicts and proposes a plan you approve first (needs a Figma token, see below).
 - **Files:** add up to 8 files per note (12 MB each): photos, PDFs, text, anything. Drop them anywhere on the panel, paste (screenshots included), or use *Add file*. Photos are scaled to 1600 px.
 - **Before / after + Undo:** finished notes show a before and after picture. *Undo change* restores the old values Claude recorded before editing (works without Claude being online): layer properties, styles, instance properties and swaps, variable bindings, variables, moved layers and new layers. Changes Claude couldn't record show no Undo button.
 
 ### Figma comments
 
-Reading comments goes through Figma's REST API and needs a personal access token (Figma → Settings → Security → Personal access tokens, scope *File comments: read*). Tick *Use Figma comments* in the panel's Options and paste it into the field that appears. It is stored on your computer only, in the plugin's data folder.
+Reading comments goes through Figma's REST API and needs a personal access token (Figma → Settings → Security → Personal access tokens, scope *File comments: read*). Pick *Apply* or *Summarize* under *Options → Comments* and paste it into the field that appears. It is stored on your computer only, in the plugin's data folder.
 
 ## How Claude handles a note
 
@@ -97,6 +99,8 @@ The procedure is the plugin's `handle-figma-notes` skill ([skills/handle-figma-n
 | `show <id>` | Full detail: file key, layer IDs, screenshot paths, Figma URL |
 | `claim <id>` | Mark as working |
 | `step <id> "msg"` | Live progress line under *Working* in the panel |
+| `plan <id> "plan"` | Show a plan with *Approve plan* / *Change something*, and wait |
+| `skills '<json>'` | Tell the panel which skills this session has |
 | `done <id> "msg"` | Reply and mark done |
 | `ask <id> "question"` | Reply and ask the designer something |
 | `say <id> "msg"` | Reply without changing status |

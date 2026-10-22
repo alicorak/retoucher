@@ -1,5 +1,5 @@
 {
-  "description": "Starts the local bridge the Figma panel talks to, and asks permission prompts in the panel while Claude works on a note.",
+  "description": "Starts the local bridge the Figma panel talks to, and asks permission prompts, Claude's questions and plan approvals in the panel while Claude works on a note.",
   "hooks": {
     "SessionStart": [
       {
@@ -20,6 +20,18 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/bridge/permission-hook.mjs\"",
             "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion|ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bridge/ask-hook.mjs\"",
+            "timeout": 300
           }
         ]
       }

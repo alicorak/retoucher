@@ -110,6 +110,16 @@
   .perm details summary { font-size: 11px; color: var(--text2); cursor: pointer; width: fit-content; }
   .perm .pa { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
   .perm .pa .grow { flex: 1; }
+  .perm .chip { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; }
+  .pq { display: grid; gap: 4px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .pq:first-of-type { border-top: 0; }
+  .pchoices { display: grid; gap: 4px; }
+  .pchoice { text-align: left; display: grid; gap: 1px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); color: var(--text); cursor: pointer; font: inherit; }
+  .pchoice small { color: var(--text2); font-size: 11px; }
+  .pchoice.on { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+  .pother, .pfeedback { height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--bg); color: var(--text); font: inherit; min-width: 0; }
+  .pplan { max-height: 220px; overflow: auto; padding: 8px; background: var(--bg); border-radius: var(--r); font-size: 12px; }
+  .pplan p { margin: 0; } .pplan p + p, .pplan p + ul, .pplan ul + p, .pplan p + ol, .pplan ol + p { margin-top: 6px; } .pplan ul, .pplan ol { margin: 4px 0 0; padding-left: 16px; }
   .prog { font-size: 11px; color: var(--text2); display: grid; gap: 2px; }
   .prog .done { padding-left: 14px; position: relative; overflow-wrap: anywhere; }
   .prog .done::before { content: '✓'; position: absolute; left: 0; color: var(--text3); }
@@ -122,10 +132,12 @@
   .prog[open] summary::after { content: ' ▾'; }
   .prog[open] summary { margin-bottom: 2px; }
   .msg.claude p { margin: 0; }
-  .msg.claude p + p, .msg.claude p + ul, .msg.claude ul + p { margin-top: 6px; }
-  .msg.claude ul { margin: 4px 0 0; padding-left: 14px; }
+  .msg.claude p + p, .msg.claude p + ul, .msg.claude ul + p, .msg.claude p + ol, .msg.claude ol + p { margin-top: 6px; }
+  .msg.claude ul, .msg.claude ol { margin: 4px 0 0; padding-left: 14px; }
   .msg.claude li + li { margin-top: 2px; }
   .msg.claude b { font-weight: 600; }
+  .msg .pa { display: flex; gap: 6px; margin-top: 8px; }
+  .msg .pa .grow { flex: 1; }
   .msg a { color: var(--brand); text-decoration: none; cursor: pointer; }
   .msg a:hover { text-decoration: underline; }
   .media { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; min-width: 0; }
@@ -181,7 +193,8 @@
   #mention .opt b { flex: 1; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #mention .opt span { flex: none; max-width: 50%; font-size: 10px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #mention .none { padding: 6px 8px; color: var(--text2); }
-  .opts { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .opts { padding: 10px; display: flex; flex-direction: column; gap: 8px; max-height: min(420px, 70vh); overflow-y: auto; }
+  .orow select { flex: 1; min-width: 0; }
   .orow { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .orow .lbl { width: 72px; flex: none; color: var(--text2); }
   .seg { flex: 1; display: flex; gap: 2px; padding: 2px; border-radius: var(--r); background: var(--bg2); min-width: 0; }
@@ -283,11 +296,23 @@
       <span class="lbl">Build with</span>
       <select id="library" title="Which design system Claude builds with"><option value="">Any library</option><option value="local">This file only</option></select>
     </div>
-    <label class="tog" title="Claude reads the Figma comments on these layers (needs a Figma token)"><input type="checkbox" id="useComments"> Use Figma comments</label>
+    <div class="orow">
+      <span class="lbl" title="Apply: Claude makes the changes the open comment threads ask for. Summarize: Claude groups them into themes and proposes a plan, and changes nothing until you approve it. Needs a Figma token.">Comments</span>
+      <div class="seg" id="comments"><button data-v="" class="on" type="button">Off</button><button data-v="apply" type="button">Apply</button><button data-v="summarize" type="button">Summarize</button></div>
+    </div>
     <div class="orow tokenRow" id="tokenRow" hidden>
       <input id="figmaToken" type="password" placeholder="Figma token (figd_…)" autocomplete="off" spellcheck="false" title="Figma → Settings → Security → Personal access tokens, scope File comments: read. Stays on your computer.">
       <button class="btn ghost sm" id="tokenSave" type="button">Save</button>
     </div>
+    <div class="orow">
+      <span class="lbl" title="Default: the model of your Claude Code session. Another model works on this note as a helper agent.">Model</span>
+      <select id="model"><option value="">Session default</option><option value="opus">Opus</option><option value="sonnet">Sonnet</option><option value="haiku">Haiku</option><option value="fable">Fable</option></select>
+    </div>
+    <div class="orow" id="skillRow" hidden>
+      <span class="lbl" title="A skill from your Claude Code session that Claude uses for this note">Skill</span>
+      <select id="skill"><option value="">None</option></select>
+    </div>
+    <label class="tog" title="Claude looks first, then shows a plan here. Nothing changes until you approve it."><input type="checkbox" id="planFirst"> Show a plan first</label>
     <label class="tog"><input type="checkbox" id="urgent"> Urgent</label>
     <label class="tog"><input type="checkbox" id="markers" checked> Show markers on canvas</label>
   </div>
@@ -398,13 +423,16 @@ function inlineText(raw) {
 function richText(text) {
   const blocks = [];
   for (const line of String(text).split('\n')) {
-    const li = line.match(/^\s*[-•]\s+(.*)$/);
+    const li = line.match(/^\s*([-•*]|\d+[.)])\s+(.*)$/);
+    const kind = li && /\d/.test(li[1]) ? 'ol' : 'ul';
+    const h = line.match(/^\s*#{1,4}\s+(.*)$/);
+    if (h) { blocks.push({ type: 'p', lines: ['**' + h[1].replace(/\*\*/g, '') + '**'] }, { type: 'gap' }); continue; }
     const prev = blocks.at(-1);
-    if (li) prev && prev.type === 'ul' ? prev.lines.push(li[1]) : blocks.push({ type: 'ul', lines: [li[1]] });
+    if (li) prev && prev.type === kind ? prev.lines.push(li[2]) : blocks.push({ type: kind, lines: [li[2]] });
     else if (!line.trim()) blocks.push({ type: 'gap' });
     else prev && prev.type === 'p' ? prev.lines.push(line) : blocks.push({ type: 'p', lines: [line] });
   }
-  return blocks.map(b => b.type === 'ul' ? `<ul>${b.lines.map(l => `<li>${inlineText(l)}</li>`).join('')}</ul>`
+  return blocks.map(b => b.type === 'ul' || b.type === 'ol' ? `<${b.type}>${b.lines.map(l => `<li>${inlineText(l)}</li>`).join('')}</${b.type}>`
     : b.type === 'p' ? `<p>${b.lines.map(inlineText).join('<br>')}</p>` : '').join('');
 }
 
@@ -731,6 +759,8 @@ function seg(id) {
 }
 const getVariations = seg('variations');
 seg('scope');
+seg('comments');
+function getComments() { return $('comments').querySelector('.on')?.dataset.v || ''; }
 // read from the button itself, so it also works for code that runs before this line
 function wholeFile() { return $('scope').querySelector('.on')?.dataset.v === 'file'; }
 
@@ -752,7 +782,10 @@ async function currentDraft() {
     mentions: mentions.filter(m => $('note').value.includes('@' + m.name)),
     library: $('library').value || null,
     variations: Number(getVariations()),
-    useComments: $('useComments').checked,
+    useComments: getComments() || null,
+    model: $('model').value || null,
+    skill: $('skill').value || null,
+    planFirst: $('planFirst').checked,
     scope: wholeFile() ? 'file' : null,
     attachments: files.map(p => ({ name: p.name, mime: p.mime, data: p.data })),
   };
@@ -767,7 +800,8 @@ function resetComposer() {
   $('note').value = ''; mentions = []; hideMentions(); clearFiles(); clearTargets();
   $('variations').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === '1'));
   $('scope').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === 'sel'));
-  $('useComments').checked = false;
+  $('comments').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
+  $('planFirst').checked = false;
   $('urgent').checked = false;
   optionsSummary(); renderTarget();
 }
@@ -784,13 +818,16 @@ document.addEventListener('mousedown', e => { if (!$('opts').hidden && !e.target
 function optionsSummary() {
   const v = getVariations();
   const on = [wholeFile() ? 'whole file' : '', v !== '1' ? v + ' versions' : '', $('library').value ? ($('library').value === 'local' ? 'this file only' : $('library').value) : '',
-    $('useComments').checked ? 'Figma comments' : '', $('urgent').checked ? 'urgent' : ''].filter(Boolean);
+    getComments() ? (getComments() === 'summarize' ? 'summarize comments' : 'apply comments') : '',
+    $('model').value ? $('model').selectedOptions[0].textContent : '', $('skill').value ? 'skill: ' + $('skill').value : '',
+    $('planFirst').checked ? 'plan first' : '', $('urgent').checked ? 'urgent' : ''].filter(Boolean);
   $('optsBadge').hidden = !on.length;
   $('optLine').hidden = !on.length;
   $('optLine').textContent = on.join(' · ');
   $('optsBtn').title = on.length ? 'Options: ' + on.join(', ') : 'Options';
 }
-['library', 'useComments', 'urgent'].forEach(id => $(id).addEventListener('change', optionsSummary));
+['library', 'model', 'skill', 'planFirst', 'urgent'].forEach(id => $(id).addEventListener('change', optionsSummary));
+$('comments').addEventListener('click', () => setTimeout(() => { optionsSummary(); showTokenRow(); }));
 $('variations').addEventListener('click', () => setTimeout(optionsSummary));
 $('scope').addEventListener('click', () => setTimeout(() => { optionsSummary(); renderTarget(); }));
 
@@ -959,15 +996,28 @@ async function refresh(force) {
     renderPerms();
     setOnline(true, !!h.claude);
     hasCommentsToken = !!h.comments; showTokenRow();
+    if (h.claude) loadSkills();
     const sig = JSON.stringify(items);
     if (force || sig !== lastSig) { lastSig = sig; renderList(); syncMarkers(); }
   } catch { setOnline(false); }
 }
 
+// ---------- skills the watching Claude Code session offers (fa skills) ----------
+let skillsSig = null;
+async function loadSkills() {
+  const list = await (await api('/skills')).json().catch(() => []);
+  const sig = JSON.stringify(list);
+  if (sig === skillsSig) return;
+  skillsSig = sig;
+  const cur = $('skill').value;
+  $('skill').innerHTML = '<option value="">None</option>' + list.map(k => `<option value="${esc(k.name)}" title="${esc(k.description)}">${esc(k.name)}</option>`).join('');
+  $('skill').value = list.some(k => k.name === cur) ? cur : '';
+  $('skillRow').hidden = !list.length;
+}
+
 // ---------- Figma token for comments: asked for only when "Use Figma comments" is on and the bridge has none ----------
 let hasCommentsToken = true;
-function showTokenRow() { $('tokenRow').hidden = hasCommentsToken || !$('useComments').checked; }
-$('useComments').addEventListener('change', showTokenRow);
+function showTokenRow() { $('tokenRow').hidden = hasCommentsToken || !getComments(); }
 $('tokenSave').onclick = async () => {
   const r = await api('/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ figmaToken: $('figmaToken').value }) }).catch(() => null);
   const j = r ? await r.json() : { error: 'bridge off' };
@@ -977,15 +1027,20 @@ $('tokenSave').onclick = async () => {
 
 // ---------- permission prompts from Claude Code (bridge/permission-hook.mjs) ----------
 let perms = [], permSig = '';
-function renderPerms() {
-  const sig = perms.map(p => p.id).join();
-  if (sig === permSig) return;
-  const fresh = perms.some(p => !permSig.split(',').includes(p.id));
-  permSig = sig;
-  const box = $('perms');
-  box.hidden = !perms.length;
-  box.innerHTML = perms.map(p => `<div class="perm" data-perm="${p.id}">
-    <span class="ph2">${p.noteId ? `Note #${esc(p.noteId)} · ` : ''}Claude asks for permission</span>
+function permHtml(p) {
+  const head = `<span class="ph2">${p.noteId ? `Note #${esc(p.noteId)} · ` : ''}${{ permission: 'Claude asks for permission', question: 'Claude asks you', plan: 'Claude’s plan' }[p.kind] || ''}</span>`;
+  if (p.kind === 'question') return `${head}
+    ${(p.questions || []).map((q, qi) => `<div class="pq" data-q="${qi}" data-multi="${q.multiSelect ? 1 : 0}">
+      ${q.header ? `<span class="chip">${esc(q.header)}</span>` : ''}<b>${esc(q.question)}</b>
+      <div class="pchoices">${q.options.map((o, oi) => `<button class="pchoice" type="button" data-o="${oi}" title="${esc(o.description)}"><span>${esc(o.label)}</span>${o.description ? `<small>${esc(o.description)}</small>` : ''}</button>`).join('')}</div>
+      <input class="pother" type="text" placeholder="Or write your own answer…">
+    </div>`).join('')}
+    <div class="pa"><button class="btn ghost sm" type="button" data-decide="skip">Skip</button><span class="grow"></span><button class="btn primary sm" type="button" data-decide="answer">Send answers</button></div>`;
+  if (p.kind === 'plan') return `${head}
+    <div class="pplan">${richText(p.plan || '')}</div>
+    <input class="pfeedback" type="text" placeholder="What should change? (for Change)">
+    <div class="pa"><button class="btn ghost sm" type="button" data-decide="revise">Change</button><span class="grow"></span><button class="btn primary sm" type="button" data-decide="approve">Approve plan</button></div>`;
+  return `${head}
     <b>${esc(p.title)}</b>
     ${p.sub ? `<span class="sub">${esc(p.sub)}</span>` : ''}
     ${p.detail ? `<details><summary>Details</summary><pre>${esc(p.detail)}</pre></details>` : ''}
@@ -994,18 +1049,49 @@ function renderPerms() {
       <span class="grow"></span>
       <button class="btn ghost sm" type="button" data-decide="always" title="${esc('Don\'t ask again for ' + (p.rule || 'this'))}">Always allow</button>
       <button class="btn primary sm" type="button" data-decide="once">Allow once</button>
-    </div>
-  </div>`).join('');
-  if (fresh) notify('Claude needs your permission');
+    </div>`;
+}
+function renderPerms() {
+  const sig = perms.map(p => p.id).join();
+  if (sig === permSig) return;
+  const fresh = perms.some(p => !permSig.split(',').includes(p.id));
+  permSig = sig;
+  const box = $('perms');
+  box.hidden = !perms.length;
+  box.innerHTML = perms.map(p => `<div class="perm" data-perm="${p.id}" data-kind="${esc(p.kind || 'permission')}">${permHtml(p)}</div>`).join('');
+  if (fresh) notify({ question: 'Claude has a question for you', plan: 'Claude made a plan for you to approve' }[perms.at(-1)?.kind] || 'Claude needs your permission');
 }
 $('perms').addEventListener('click', async e => {
+  const choice = e.target.closest('.pchoice');
+  if (choice) {
+    const q = choice.closest('.pq');
+    if (q.dataset.multi !== '1') q.querySelectorAll('.pchoice').forEach(x => x !== choice && x.classList.remove('on'));
+    choice.classList.toggle('on');
+    return;
+  }
   const b = e.target.closest('[data-decide]'); if (!b) return;
-  const id = b.closest('[data-perm]').dataset.perm;
-  b.closest('.perm').querySelectorAll('button').forEach(x => (x.disabled = true));
+  const card = b.closest('[data-perm]'), id = card.dataset.perm, p = perms.find(x => x.id === id) || {};
+  const body = { decision: b.dataset.decide };
+  if (p.kind === 'question' && body.decision === 'answer') {
+    body.answers = {};
+    for (const el of card.querySelectorAll('.pq')) {
+      const q = p.questions[Number(el.dataset.q)];
+      const picked = [...el.querySelectorAll('.pchoice.on')].map(x => q.options[Number(x.dataset.o)].label);
+      const own = el.querySelector('.pother').value.trim();
+      if (own) picked.push(own);
+      if (!picked.length) { notify('Pick an answer for every question, or Skip'); el.querySelector('.pother').focus(); return; }
+      body.answers[q.question] = picked.join(', ');
+    }
+  }
+  if (p.kind === 'plan' && body.decision === 'revise') {
+    body.feedback = card.querySelector('.pfeedback').value.trim();
+    if (!body.feedback) { notify('Write what should change'); card.querySelector('.pfeedback').focus(); return; }
+  }
+  card.querySelectorAll('button, input').forEach(x => (x.disabled = true));
   try {
-    await api(`/permissions/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: b.dataset.decide }) });
+    await api(`/permissions/${id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   } catch { notify('Could not answer: bridge off'); }
-  perms = perms.filter(p => p.id !== id); renderPerms();
+  perms = perms.filter(x => x.id !== id); renderPerms();
 });
 
 function syncMarkers() {
@@ -1069,9 +1155,11 @@ function mediaHtml(it) {
 }
 
 function itemHtml(it) {
-  const thread = it.thread.map(t => `<div class="msg ${t.from}">${t.from === 'system' ? '' : `<small>${t.from === 'claude' ? 'Claude' : 'You'}</small>`}${t.from === 'claude' ? richText(t.text) : esc(t.text)}</div>`).join('');
+  const lastPlan = it.status === 'question' && it.thread.at(-1)?.kind === 'plan';
+  const thread = it.thread.map((t, i) => `<div class="msg ${t.from}${t.kind === 'plan' ? ' plan' : ''}">${t.from === 'system' ? '' : `<small>${t.from === 'claude' ? (t.kind === 'plan' ? 'Claude · Plan' : 'Claude') : 'You'}</small>`}${t.from === 'claude' ? richText(t.text) : esc(t.text)}${lastPlan && i === it.thread.length - 1 ? `<div class="pa"><button class="btn ghost sm" type="button" data-plan-change="${it.id}">Change something</button><span class="grow"></span><button class="btn primary sm" type="button" data-plan-ok="${it.id}">Approve plan</button></div>` : ''}</div>`).join('');
   const meta = [it.priority === 'urgent' ? 'urgent' : '', it.variations > 1 ? `${it.variations} versions` : '', it.library ? `library: ${it.library === 'local' ? 'this file' : it.library}` : '',
-    (it.mentions || []).length ? '@ ' + it.mentions.map(m => m.name).join(', ') : '', it.useComments ? 'uses comments' : '', it.batchMode === 'parallel' ? 'parallel' : ''].filter(Boolean).join(' · ');
+    (it.mentions || []).length ? '@ ' + it.mentions.map(m => m.name).join(', ') : '', it.useComments ? (it.useComments === 'summarize' ? 'summarize comments' : 'apply comments') : '',
+    it.model ? it.model : '', it.skill ? 'skill: ' + it.skill : '', it.planFirst ? 'plan first' : '', it.batchMode === 'parallel' ? 'parallel' : ''].filter(Boolean).join(' · ');
   const showCmp = it.status === 'done' && it.hasBefore && it.hasAfter;
   const canUndo = it.status === 'done' && it.patch && !it.reverted;
   const replyOpen = !it.reverted && (it.status === 'question' || openReplies.has(it.id) || replyDrafts[it.id]);
@@ -1171,6 +1259,14 @@ function redrawItem(id) { const it = items.find(i => i.id === id); const el = do
 $('list').addEventListener('click', async e => {
   const link = e.target.closest('a[data-href]');
   if (link) { e.preventDefault(); e.stopPropagation(); post({ type: 'open-url', url: link.dataset.href }); return; }
+  const planOk = e.target.closest('[data-plan-ok]');
+  if (planOk) { planOk.disabled = true; await sendReply(planOk.dataset.planOk, 'Plan approved. Go ahead.'); return; }
+  const planChange = e.target.closest('[data-plan-change]');
+  if (planChange) {
+    const id = planChange.dataset.planChange; openReplies.add(id); redrawItem(id);
+    const input = document.querySelector(`.replyInput[data-id="${id}"]`); if (input) { input.placeholder = 'What should change in the plan?'; input.focus(); }
+    return;
+  }
   const select = e.target.closest('[data-select]');
   if (select) { const it = items.find(i => i.id === select.dataset.select); if (it && it.focus) post({ type: 'focus', ids: it.focus }); return; }
   const undo = e.target.closest('[data-undo]');
@@ -1207,12 +1303,15 @@ $('list').addEventListener('keydown', async e => {
   if (e.key !== 'Enter') return;
   const text = e.target.value.trim();
   if (!text) return;
-  await api(`/annotations/${id}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'user', text }) });
-  delete replyDrafts[id]; openReplies.delete(id);
   e.target.value = '';
   e.target.blur();
-  refresh(true);
+  await sendReply(id, text);
 });
+async function sendReply(id, text) {
+  await api(`/annotations/${id}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: 'user', text }) });
+  delete replyDrafts[id]; openReplies.delete(id);
+  refresh(true);
+}
 
 // ---------- keyboard ----------
 document.addEventListener('keydown', e => {

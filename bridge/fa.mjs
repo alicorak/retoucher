@@ -8,6 +8,8 @@
 //   fa say <id> "message"       reply without changing status
 //   fa edit <id> "message"      rewrite Claude's last reply on the note
 //   fa step <id> "what now"     live progress line shown under "Working" in the plugin
+//   fa plan <id> "plan"         show a plan for the designer to approve (Approve / Change), and wait
+//   fa skills '<json>'          tell the panel which skills this session has: [{"name","description"}]
 //   fa snapshot <id> before|after <png>   store a before/after screenshot (shown in the plugin)
 //   fa patch <id> <json-file>   store the revert patch so the plugin can Undo (see CLAUDE.md)
 //   fa focus <id> <json-file>   layers to select in Figma (JSON array of node ids); the plugin shows a Select button
@@ -34,7 +36,8 @@ const batchLabel = it => (it.batchId ? ` [batch ${it.batchId}${it.batchMode === 
   + (it.variations > 1 ? ` [${it.variations} variations]` : '')
   + (it.mentions?.length ? ` [@ ${it.mentions.map(m => m.name).join(', ')}]` : '')
   + (it.library ? ` [library ${it.library}]` : '')
-  + (it.useComments ? ' [use comments]' : '');
+  + (it.useComments ? ` [comments: ${it.useComments === 'summarize' ? 'summarize' : 'apply'}]` : '')
+  + (it.model ? ` [model ${it.model}]` : '') + (it.planFirst ? ' [plan first]' : '') + (it.skill ? ` [skill ${it.skill}]` : '');
 const nodesLabel = it => it.scope === 'file' ? `whole file "${it.fileName || '?'}"` : it.nodes.map(n => n.region ? `area ${n.w}×${n.h} in "${n.region.frameName || 'page'}"` : `${n.name} (${n.id})`).join(', ') || `whole page "${it.pageName || '?'}"`;
 
 async function main() {
@@ -84,6 +87,18 @@ async function main() {
       await api(`/annotations/${a}/messages`, { method: 'POST', body: { from: 'claude', text, status, replaceLast: cmd === 'edit' } });
       return console.log(`#${a} ${cmd === 'edit' ? 'reply rewritten' : status || 'replied'}`);
     }
+    case 'plan': {
+      const text = rest.join(' ');
+      if (!text) throw new Error('usage: fa plan <id> "the plan, in markdown"');
+      await api(`/annotations/${a}/messages`, { method: 'POST', body: { from: 'claude', text, status: 'question', kind: 'plan' } });
+      return console.log(`#${a} plan shown, waiting for approval`);
+    }
+    case 'skills': {
+      if (!a) throw new Error(`usage: fa skills '[{"name":"…","description":"…"}]'`);
+      const skills = JSON.parse([a, ...rest].join(' '));
+      const r = await api('/skills', { method: 'POST', body: { skills } });
+      return console.log(`${r.count} skills offered in the panel`);
+    }
     case 'step': {
       const text = rest.join(' ');
       if (!text) throw new Error('usage: fa step <id> "what you are doing"');
@@ -129,7 +144,7 @@ async function main() {
       }
     }
     default:
-      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|edit|step|comments|unpair|watch');
+      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|edit|step|plan|skills|comments|unpair|watch');
   }
 }
 
