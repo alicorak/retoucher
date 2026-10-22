@@ -40,7 +40,16 @@ if (running?.foreign) {
   console.log(`Annotate for Claude: port ${PORT} is used by another program, so the Figma panel can't connect. Free it or set FA_PORT.`);
   process.exit(0);
 }
-if (running && (running.version === VERSION || running.version === 'dev')) process.exit(0);
+// Several agents start this (Claude Code, Codex, Cursor), each from its own copy of the plugin, which may be
+// older or newer. Replace a running bridge only with a newer version, so agents never take turns downgrading it.
+// A bridge from a checkout ("dev") is left alone.
+const newer = (a, b) => {
+  const n = v => String(v).split(/[.+-]/).slice(0, 3).map(x => parseInt(x, 10) || 0);
+  const [x, y] = [n(a), n(b)];
+  for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i];
+  return false;
+};
+if (running && (running.version === 'dev' || VERSION === 'dev' || !newer(VERSION, running.version))) process.exit(0);
 if (running) { // older version: ask it to stop, then start ours
   await fetch(BASE + '/quit', { method: 'POST' }).catch(() => {});
   for (let i = 0; i < 20 && await health(); i++) await sleep(100);

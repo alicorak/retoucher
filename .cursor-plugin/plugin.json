@@ -1,6 +1,6 @@
 {
   "name": "figma-annotate",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Leave notes on layers and areas in Figma; your coding agent (Claude Code, Codex, Cursor) picks them up, edits the file through the Figma MCP, shows its steps and asks for permissions in the Figma panel.",
   "homepage": "https://github.com/alicorak/figma-annotate",
   "repository": "https://github.com/alicorak/figma-annotate",
