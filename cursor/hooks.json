@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeMCPExecution": [
+      {
+        "command": "node \"${CURSOR_PLUGIN_ROOT:-.}/bridge/cursor-hook.mjs\"",
+        "timeout": 120,
+        "failClosed": true
+      }
+    ]
+  }
+}

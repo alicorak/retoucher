@@ -2,21 +2,21 @@
 
 Leave notes in Figma, your coding agent does the work. Select a layer (or mark an area like a comment), write what should change, press Send. The agent picks the note up, edits the file through the Figma MCP, shows its steps live, asks its questions and permissions in the same panel and answers there. Undo and before/after pictures included.
 
-Works with **Claude Code** and **Codex**. Cursor is next.
+Works with **Claude Code**, **Codex** and **Cursor**.
 
 ```
-Figma panel  ──▶  bridge on your computer (localhost:4747)  ◀──  Claude Code / Codex (any folder)
+Figma panel  ──▶  bridge on your computer (localhost:4747)  ◀──  Claude Code / Codex / Cursor
                   notes, screenshots, questions, permissions       edits Figma through the Figma MCP
 ```
 
 Two parts, installed once:
 
-1. **Agent plugin** (Claude Code or Codex): starts the bridge, teaches the agent how to handle notes, routes its questions and permission prompts to the panel.
+1. **Agent plugin** (Claude Code, Codex or Cursor): starts the bridge, teaches the agent how to handle notes, routes its questions and permission prompts to the panel.
 2. **Figma plugin**: the panel you write notes in.
 
 ## Requirements
 
-- [Claude Code](https://claude.com/claude-code) or [Codex](https://developers.openai.com/codex) with the **Figma MCP server** connected, and edit access to the Figma files you want to change
+- [Claude Code](https://claude.com/claude-code), [Codex](https://developers.openai.com/codex) or [Cursor](https://cursor.com) with the **Figma MCP server** connected, and edit access to the Figma files you want to change
 - [Node.js](https://nodejs.org) 18 or newer
 - Figma desktop app or browser (in a browser, allow it to reach your computer if it asks)
 
@@ -40,6 +40,15 @@ codex plugin marketplace add alicorak/figma-annotate
 
 Then install **Annotate for Claude** from `/plugins` in the Codex CLI (or the Plugins tab of the desktop app) and start a new session. Codex asks you to review and trust the plugin's hooks once; they ask permission prompts in the Figma panel. The note tools come from the plugin's `figma-annotate` MCP server, so Codex's sandbox doesn't need network access.
 
+**Cursor.** Until the plugin is in the Cursor Marketplace, install it from GitHub:
+
+```bash
+git clone https://github.com/alicorak/figma-annotate.git ~/.figma-annotate-plugin
+mkdir -p ~/.cursor/plugins/local && ln -s ~/.figma-annotate-plugin ~/.cursor/plugins/local/figma-annotate
+```
+
+Restart Cursor. The plugin adds the `figma-annotate` MCP server, the skills, and a hook that asks Figma MCP approvals in the panel while the agent works on a note. Update later with `git -C ~/.figma-annotate-plugin pull`.
+
 ### 2. Figma plugin
 
 Run **Annotate for Claude** from Figma's plugins (Community). The first time it connects, the panel pairs with the bridge on your computer (see *Privacy*).
@@ -47,7 +56,7 @@ Run **Annotate for Claude** from Figma's plugins (Community). The first time it 
 ### 3. Start watching
 
 - **Claude Code**, any folder: `/figma-annotate:watch`
-- **Codex**: ask it to "watch my Figma notes" (the `watch-figma-notes` skill)
+- **Codex** or **Cursor** (Agent): ask it to "watch my Figma notes" (the `watch-figma-notes` skill)
 
 The panel's top-right tells you where things stand:
 
@@ -78,7 +87,7 @@ Tip: select the specific layer you mean. A selection that covers a whole row of 
 - **Whole page or whole file:** send a note with nothing selected and it is about the page. *Options → Applies to → Whole file* makes it about every page of the file ("all headings above 32 pt in Druk", "dark mode for every screen").
 - **Questions and plans in the panel:** when Claude asks a multiple-choice question or wants a plan approved, it shows as a card in the panel. Pick answers (or write your own) and send, or *Approve plan* / *Change* with a note. Turn on *Options → Show a plan first* to see Claude's plan before anything changes.
 - **Model and skill per note:** *Options → Model* puts Opus, Sonnet, Haiku or Fable on a note (as a helper agent of your session). *Options → Skill* lists the skills of the Claude Code session that is watching.
-- **Permissions in the panel:** when Claude needs permission for a tool while working on a note, the question shows in the panel: *Allow once*, *Always allow* or *Decline*. No need to go back to Claude Code. If the panel is closed, no note is being worked on, or nobody answers within 2 minutes, Claude Code asks in its own window as usual. *Always allow* saves the same rule the terminal's "don't ask again" would. The plugin's own `fa` command (it only talks to the local bridge) runs without asking.
+- **Permissions in the panel:** when the agent needs permission for a tool while working on a note, the question shows in the panel: *Allow once*, *Always allow* or *Decline*. In Cursor this covers MCP tools (the Figma edits); shell commands are still approved in Cursor. No need to go back to the agent. If the panel is closed, no note is being worked on, or nobody answers within 2 minutes, the agent asks in its own window as usual. *Always allow* saves the same rule the terminal's "don't ask again" would. The plugin's own `fa` command (it only talks to the local bridge) runs without asking.
 - **Live progress:** while Claude works, the note shows the step it is on and the last ones it finished. Afterwards they fold into "N steps".
 - **Selecting opens the note:** select a layer on the canvas and the note about it is highlighted in the panel.
 - **Options:** scope, versions, design system, comments, model, skill, plan first, urgent and canvas markers sit behind *Options*. The button shows what is switched on.
@@ -96,7 +105,7 @@ Reading comments goes through Figma's REST API and needs a personal access token
 
 ## How the agent handles a note
 
-The procedure is the plugin's `handle-figma-notes` skill ([skills/handle-figma-notes/SKILL.md](skills/handle-figma-notes/SKILL.md)). Claude Code uses the `fa` command, which is on its PATH while the plugin is enabled. Codex uses the same commands as tools of the `figma-annotate` MCP server (`wait_for_note`, `claim_note`, `add_step`, `finish_note`, `ask_designer`, …).
+The procedure is the plugin's `handle-figma-notes` skill ([skills/handle-figma-notes/SKILL.md](skills/handle-figma-notes/SKILL.md)). Claude Code uses the `fa` command, which is on its PATH while the plugin is enabled. Codex and Cursor use the same commands as tools of the `figma-annotate` MCP server (`wait_for_note`, `claim_note`, `add_step`, `finish_note`, `ask_designer`, …).
 
 | Command | What it does |
 | --- | --- |
