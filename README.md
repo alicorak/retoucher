@@ -1,36 +1,44 @@
 # Annotate for Claude
 
-Leave notes in Figma, Claude Code does the work. Select a layer (or mark an area like a comment), write what should change, press Send. Claude Code picks the note up, edits the file through the Figma MCP, shows its steps live, asks for permissions in the same panel and answers there. Undo and before/after pictures included.
+Leave notes in Figma, your coding agent does the work. Select a layer (or mark an area like a comment), write what should change, press Send. The agent picks the note up, edits the file through the Figma MCP, shows its steps live, asks its questions and permissions in the same panel and answers there. Undo and before/after pictures included.
+
+Works with **Claude Code** and **Codex**. Cursor is next.
 
 ```
-Figma panel  ──▶  bridge on your computer (localhost:4747)  ◀──  Claude Code (any folder)
-                  notes, screenshots, permission prompts         edits Figma through the Figma MCP
+Figma panel  ──▶  bridge on your computer (localhost:4747)  ◀──  Claude Code / Codex (any folder)
+                  notes, screenshots, questions, permissions       edits Figma through the Figma MCP
 ```
 
 Two parts, installed once:
 
-1. **Claude Code plugin**: starts the bridge, teaches Claude how to handle notes, routes permission prompts to the panel.
+1. **Agent plugin** (Claude Code or Codex): starts the bridge, teaches the agent how to handle notes, routes its questions and permission prompts to the panel.
 2. **Figma plugin**: the panel you write notes in.
 
 ## Requirements
 
-- [Claude Code](https://claude.com/claude-code) (terminal or the Claude desktop app) with the **Figma MCP server** connected, and edit access to the Figma files you want to change
+- [Claude Code](https://claude.com/claude-code) or [Codex](https://developers.openai.com/codex) with the **Figma MCP server** connected, and edit access to the Figma files you want to change
 - [Node.js](https://nodejs.org) 18 or newer
 - Figma desktop app or browser (in a browser, allow it to reach your computer if it asks)
 
 ## Install
 
-### 1. Claude Code plugin
+### 1. Agent plugin
 
-In a terminal:
+**Claude Code.** In a terminal:
 
 ```bash
 claude plugin install figma-annotate --marketplace alicorak/figma-annotate
 ```
 
-Or inside Claude Code: `/plugin marketplace add alicorak/figma-annotate`, then `/plugin install figma-annotate@figma-annotate`. In the Claude desktop app: **+ → Plugins** works too.
+Or inside Claude Code: `/plugin marketplace add alicorak/figma-annotate`, then `/plugin install figma-annotate@figma-annotate`. In the Claude desktop app: **+ → Plugins** works too. It is installed for you, not for one project, so it works in whatever folder you open Claude Code in.
 
-It is installed for you, not for one project, so it works in whatever folder you open Claude Code in.
+**Codex.** In a terminal:
+
+```bash
+codex plugin marketplace add alicorak/figma-annotate
+```
+
+Then install **Annotate for Claude** from `/plugins` in the Codex CLI (or the Plugins tab of the desktop app) and start a new session. Codex asks you to review and trust the plugin's hooks once; they ask permission prompts in the Figma panel. The note tools come from the plugin's `figma-annotate` MCP server, so Codex's sandbox doesn't need network access.
 
 ### 2. Figma plugin
 
@@ -38,20 +46,17 @@ Run **Annotate for Claude** from Figma's plugins (Community). The first time it 
 
 ### 3. Start watching
 
-In Claude Code, any folder:
-
-```
-/figma-annotate:watch
-```
+- **Claude Code**, any folder: `/figma-annotate:watch`
+- **Codex**: ask it to "watch my Figma notes" (the `watch-figma-notes` skill)
 
 The panel's top-right tells you where things stand:
 
 | Panel | Meaning |
 | --- | --- |
-| 🟢 Claude ready | Claude is watching; notes are picked up right away |
-| 🟡 Not watching | The bridge runs, but no Claude Code session watches. Notes wait until you run `/figma-annotate:watch` |
-| 🔴 Not connected | Claude Code isn't open (opening it starts the bridge), or the Claude Code plugin isn't installed |
-| Not paired | Another Figma panel is paired with this bridge; ask Claude Code to run `fa unpair` |
+| 🟢 Claude ready | An agent is watching; notes are picked up right away |
+| 🟡 Not watching | The bridge runs, but no agent watches. Notes wait until you start watching |
+| 🔴 Not connected | No agent session is open (opening one starts the bridge), or the agent plugin isn't installed |
+| Not paired | Another Figma panel is paired with this bridge; ask the agent to run `fa unpair` |
 
 ## Using it
 
@@ -89,9 +94,9 @@ Tip: select the specific layer you mean. A selection that covers a whole row of 
 
 Reading comments goes through Figma's REST API and needs a personal access token (Figma → Settings → Security → Personal access tokens, scope *File comments: read*). Pick *Apply* or *Summarize* under *Options → Comments* and paste it into the field that appears. It is stored on your computer only, in the plugin's data folder.
 
-## How Claude handles a note
+## How the agent handles a note
 
-The procedure is the plugin's `handle-figma-notes` skill ([skills/handle-figma-notes/SKILL.md](skills/handle-figma-notes/SKILL.md)). Claude uses the `fa` command, which is on its PATH while the plugin is enabled:
+The procedure is the plugin's `handle-figma-notes` skill ([skills/handle-figma-notes/SKILL.md](skills/handle-figma-notes/SKILL.md)). Claude Code uses the `fa` command, which is on its PATH while the plugin is enabled. Codex uses the same commands as tools of the `figma-annotate` MCP server (`wait_for_note`, `claim_note`, `add_step`, `finish_note`, `ask_designer`, …).
 
 | Command | What it does |
 | --- | --- |
@@ -125,13 +130,13 @@ The procedure is the plugin's `handle-figma-notes` skill ([skills/handle-figma-n
 
 ## Privacy
 
-Everything stays on your computer. The bridge listens on `localhost` only and keeps notes, screenshots and files in the Claude Code plugin's data folder (`~/.claude/plugins/data/…`). The Figma plugin talks to that bridge and nothing else.
+Everything stays on your computer. The bridge listens on `localhost` only and keeps notes, screenshots and files in `~/.figma-annotate`, shared by every agent. The Figma plugin talks to that bridge and nothing else.
 
 Websites you visit can also reach `localhost`, so the bridge only answers a page that carries the key of the Figma panel that paired with it first. Without it, a page can't read your notes, send notes or answer permission prompts. Claude Code and its hooks run on your computer and need no key.
 
 ## Development
 
-Run the bridge from a checkout with `./start.sh` (notes go to `data/`), import `plugin/manifest.json` in the Figma desktop app (**Plugins → Development → Import plugin from manifest…**), and load the Claude Code plugin from the folder with `claude --plugin-dir .`.
+Run the bridge from a checkout with `./start.sh` (notes go to `data/`), import `plugin/manifest.json` in the Figma desktop app (**Plugins → Development → Import plugin from manifest…**), and load the Claude Code plugin from the folder with `claude --plugin-dir .`. The MCP server (`bridge/mcp-server.mjs`) speaks MCP over stdio with no dependencies; `codex plugin marketplace add ./` installs the checkout in Codex.
 
 ## License
 

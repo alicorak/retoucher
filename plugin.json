@@ -1,0 +1,26 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "figma-annotate",
+  "version": "0.4.0",
+  "description": "Leave notes on layers and areas in Figma; your coding agent (Claude Code, Codex, Cursor) picks them up, edits the file through the Figma MCP, shows its steps and asks for permissions in the Figma panel.",
+  "author": {
+    "name": "Ali Çorak",
+    "url": "https://github.com/alicorak"
+  },
+  "homepage": "https://github.com/alicorak/figma-annotate",
+  "repository": "https://github.com/alicorak/figma-annotate",
+  "license": "MIT",
+  "keywords": [
+    "figma",
+    "design",
+    "annotations",
+    "handoff"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Annotate for Claude"
+      }
+    }
+  }
+}

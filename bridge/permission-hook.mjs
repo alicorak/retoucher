@@ -61,7 +61,10 @@ function plainFa(cmd) {
 
 const input = JSON.parse((await readStdin()) || '{}');
 const tool = input.tool_name || '';
-if (tool === 'Bash' && plainFa(String(input.tool_input?.command || '').trim())) out({ behavior: 'allow' });
+// Claude Code sends the command as a string; Codex may send an argv array such as ["bash", "-lc", "fa list"]
+const cmd = input.tool_input?.command;
+const cmdText = Array.isArray(cmd) ? String(cmd.at(-1) ?? '') : String(cmd || '');
+if (tool === 'Bash' && plainFa(cmdText.trim())) out({ behavior: 'allow' });
 // questions and plan approval go through ask-hook.mjs (PreToolUse), which can pass the answers on
 if (!tool || tool === 'AskUserQuestion' || tool === 'ExitPlanMode') passThrough();
 

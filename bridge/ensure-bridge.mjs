@@ -1,18 +1,29 @@
 #!/usr/bin/env node
-// SessionStart hook of the Claude Code plugin: makes sure one bridge runs on this machine, for every session.
+// Makes sure one bridge runs on this machine, shared by every agent and session: run by the Claude Code / Codex
+// SessionStart hook and by the MCP server when it starts.
 // The bridge outlives the session that started it, so the Figma panel stays connected; a newer plugin version
 // replaces an older bridge. A bridge started from a repo checkout ("dev") is left alone.
 // Prints nothing when all is well (SessionStart output becomes context in every session).
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.FA_PORT || 4747);
 const BASE = `http://localhost:${PORT}`;
-const DATA = path.resolve(process.argv[2] || process.env.FA_DATA || path.join(ROOT, 'data'));
-const VERSION = (() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin', 'plugin.json'), 'utf8')).version; } catch { return 'dev'; } })();
+// One data folder for every agent, so notes, pairing and the Figma token are the same whichever agent starts the
+// bridge. The argument is the folder an older version used (the agent's plugin data folder): copied over once.
+const DATA = path.resolve(process.env.FA_DATA || path.join(os.homedir(), '.figma-annotate'));
+const LEGACY = process.argv[2] ? path.resolve(process.argv[2]) : null;
+const VERSION = (() => {
+  for (const f of ['plugin.json', path.join('.claude-plugin', 'plugin.json')]) {
+    try { return JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8')).version; } catch {}
+  }
+  return 'dev';
+})();
+if (!fs.existsSync(DATA) && LEGACY && fs.existsSync(path.join(LEGACY, 'annotations.json'))) fs.cpSync(LEGACY, DATA, { recursive: true });
 
 const health = async () => {
   try {

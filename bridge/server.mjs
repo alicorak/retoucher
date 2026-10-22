@@ -8,7 +8,12 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // installed as a Claude Code plugin, notes live in the plugin's data folder (FA_DATA), which survives updates
 const DATA = process.env.FA_DATA ? path.resolve(process.env.FA_DATA) : path.join(ROOT, 'data');
-const VERSION = (() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, '.claude-plugin', 'plugin.json'), 'utf8')).version; } catch { return 'dev'; } })();
+const VERSION = (() => {
+  for (const f of ['plugin.json', path.join('.claude-plugin', 'plugin.json')]) {
+    try { return JSON.parse(fs.readFileSync(path.join(ROOT, f), 'utf8')).version; } catch {}
+  }
+  return 'dev';
+})();
 const IMAGES = path.join(DATA, 'images');
 const DB = path.join(DATA, 'annotations.json');
 const PORT = Number(process.env.FA_PORT || 4747);
