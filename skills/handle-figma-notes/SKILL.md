@@ -1,6 +1,6 @@
 ---
 name: handle-figma-notes
-description: Handle notes sent from the "Annotate for Claude" Figma plugin (NEW #id lines from fa watch or wait_for_note). Use whenever a Figma note arrives or the user asks to work on Figma notes; covers claiming, reading targets and areas, editing through the Figma MCP, undo patches, before/after snapshots, live steps, questions, plans and the reply.
+description: Handle notes sent from the "Annotate for Claude" Figma plugin (NEW #id lines from fa watch or wait_for_note). Use whenever a Figma note arrives or the user asks to work on Figma notes; covers claiming, reading targets and areas, editing through the Figma MCP, text and font changes through the panel (local fonts), undo patches, before/after snapshots, live steps, questions, plans and the reply.
 ---
 
 # Handling Figma notes
@@ -81,9 +81,11 @@ The designer reads it in a narrow panel, next to the before/after pictures. Writ
 - Use real line breaks (`$'line1\nline2'` in zsh). The panel renders paragraphs, `- ` lists, `**bold**` and links.
 - To rewrite your last reply on a note, `fa edit <id> "<reply>"`.
 
-## Text in local fonts
+## Text and font changes: always through the panel
 
-The Figma MCP can't load fonts installed on the designer's computer (often the brand fonts: Druk, KMR Waldenburg, GT …). With those it can't change text at all: not the family, not the size, not the spacing. The Figma panel can, because it runs inside the designer's Figma. So for **any text change** (font family, style, size, letter spacing, line height), use the panel:
+**Rule: never change a font family, style, size, letter spacing or line height with `use_figma`. Always use `fa text` (MCP: `edit_text_in_figma`).** Don't try `loadFontAsync` in `use_figma` first, and don't give up because a font "can't be loaded": the panel loads it.
+
+Why: the Figma MCP can't load fonts installed on the designer's computer (often the brand fonts: Druk, KMR Waldenburg, GT …), and with those it can't touch the text at all. The Figma panel runs inside the designer's Figma and can. Going through the panel for every text change means you never have to know which fonts are local. Everything else (layout, copies, colours, components) stays with `use_figma`; a note can mix both, e.g. duplicate a frame with `use_figma`, then change its fonts with `fa text` on the copy's id.
 
 1. Find what is installed: `fa fonts <id> "waldenburg"` → `KMR Waldenburg: Regular, Medium, Bold`. Pick the family exactly as listed.
 2. Find the layers with the Figma MCP (read-only works whatever the font): a frame or section id to change everything inside, or text layer ids.
@@ -114,6 +116,7 @@ The designer watches the note while you work. Post a step with `fa step <id> "�
 
 ## Rules
 
+- Text styling (family, style, size, spacing, line height) only through `fa text`, see above.
 - Never delete or overwrite user layers without a recorded patch.
 - Create new things next to existing work, not on top of it. Check free space first.
 - Several notes in one `[batch ...]`: handle them in order, one `claim` → `done` cycle each. A `[batch ..., parallel]` may run at the same time: give each note that touches different screens its own subagent (it follows this whole file for its note), and do the ones on the same screen yourself, in order.

@@ -6,7 +6,7 @@ description: Start watching the Annotate for Claude Figma panel for notes and ha
 # Watching for Figma notes
 
 1. Tell the panel which skills you have, so the designer can pick one per note: `offer_skills` (or `fa skills '<json>'`) with `{name, description}` for each skill that makes sense for design work in Figma (description under 100 characters).
-   If you can hand a task to a helper agent on another model, also offer those models with their full names as your environment lists them: `offer_models` (or `fa models '<json>'`), `{id, name}` each, where `id` is what you pass when handing over. Never guess a version; skip this if you can't choose a model.
+   If you can hand a task to a helper agent on another model, always also offer those models (the panel hides its Model option until you do) with their full names as your environment lists them: `offer_models` (or `fa models '<json>'`), `{id, name}` each, where `id` is what you pass when handing over. Never guess a version; skip this if you can't choose a model.
 2. Handle whatever is already waiting: `list_notes` (or `fa list`), each with the `handle-figma-notes` skill.
 3. Watch:
    - **Claude Code:** start a Monitor on `fa watch` (timeout at the maximum, re-armed whenever it expires) and handle every note it reports.
