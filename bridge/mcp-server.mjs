@@ -39,7 +39,7 @@ const noteLine = it => {
   const fromUser = last?.from === 'user';
   const kind = fromUser ? (it.status === 'working' ? ' (message while working)' : ' (follow-up)') : '';
   const opts = [it.scope === 'file' ? 'whole file' : '', it.variations > 1 ? `${it.variations} versions` : '', it.useComments ? `comments: ${it.useComments}` : '',
-    it.model ? `model ${it.model}` : '', it.planFirst ? 'plan first' : '', it.skill ? `skill ${it.skill}` : '', it.priority === 'urgent' ? 'urgent' : ''].filter(Boolean).join(', ');
+    it.model ? `model ${it.modelName || it.model} (id ${it.model})` : '', it.planFirst ? 'plan first' : '', it.skill ? `skill ${it.skill}` : '', it.priority === 'urgent' ? 'urgent' : ''].filter(Boolean).join(', ');
   const where = it.scope === 'file' ? 'whole file' : it.nodes.length ? it.nodes.map(n => n.region ? `area in "${n.region.frameName || 'page'}"` : `${n.name} (${n.id})`).join(', ') : `page "${it.pageName || '?'}"`;
   return `#${it.id}${kind}${opts ? ` [${opts}]` : ''}: ${(fromUser ? last.text : it.note).replace(/\s+/g, ' ').slice(0, 300)} — ${where}`;
 };
@@ -101,9 +101,40 @@ const TOOLS = [
     run: async a => { await api(`/annotations/${a.id}`, { method: 'PATCH', body: { focus: a.ids } }); return 'ok'; } },
   { name: 'figma_comments', description: 'Open Figma comment threads of the note\'s file (needs a token, set in the panel).', inputSchema: S({ id, all: { type: 'boolean', description: 'Include resolved threads' } }, ['id']),
     run: async a => { const it = await api(`/annotations/${a.id}`); return JSON.stringify(await api(`/comments/${it.fileKey}${a.all ? '' : '?open=1'}`), null, 2); } },
+  { name: 'list_local_fonts', description: 'Fonts installed on the designer\'s computer as Figma sees them (the Figma MCP can\'t load these). Run by the Figma panel, which must be open in the note\'s file.',
+    inputSchema: S({ id, query: text('Part of a family name, e.g. "Waldenburg"') }, ['id']),
+    run: async a => { const r = await runJob(a.id, 'fonts', { query: a.query || '' }); return r.error ? `error: ${r.error}` : r.fonts.length ? r.fonts.map(f => `${f.family}: ${f.styles.join(', ')}`).join('\n') : '(no matching fonts)'; } },
+  { name: 'edit_text_in_figma', description: 'Change text in Figma through the panel, which can load local fonts: font family/style, size, letter spacing, line height, per text range. Undo is recorded automatically. Use it for any text in a font the Figma MCP can\'t load.',
+    inputSchema: S({ id, ops: { type: 'array', items: S({
+      nodeIds: { type: 'array', items: { type: 'string' }, description: 'Text layers, or frames whose text layers all change' },
+      within: { type: 'string', description: 'A frame, section or page id: every text layer inside' },
+      family: { type: 'string' }, style: { type: 'string', description: 'Omit to keep each range\'s weight (closest style of the new family)' },
+      fontSize: { type: 'number' }, fontSizeDelta: { type: 'number' },
+      letterSpacing: { type: 'object', description: '{ unit: "PIXELS"|"PERCENT", value }' }, lineHeight: { type: 'object', description: '{ unit: "PIXELS"|"PERCENT"|"AUTO", value? }' },
+      match: S({ family: { type: 'string' }, style: { type: 'string' }, minSize: { type: 'number' }, maxSize: { type: 'number' } }),
+    }) } }, ['id', 'ops']),
+    run: async a => {
+      const r = await runJob(a.id, 'text', { ops: a.ops });
+      if (r.error) return `error: ${r.error}`;
+      return [`changed ${r.changedLayers} text layers (${r.changedRanges} ranges); Undo recorded`, ...(r.skipped || []).map(k => `skipped ${k.name || k.id || k.op}: ${k.reason}`)].join('\n');
+    } },
+  { name: 'offer_models', description: 'Tell the panel which models you can hand a note to (as a helper agent), with their real names, so the designer can pick one per note. Skip it if you can\'t choose a model for a helper.',
+    inputSchema: S({ models: { type: 'array', items: S({ id: { type: 'string', description: 'What you pass when you hand the note over' }, name: { type: 'string', description: 'Full name, e.g. "GPT-5.5" or "Claude Opus 5.5"' } }, ['id', 'name']) } }, ['models']),
+    run: async a => { const r = await api('/models', { method: 'POST', body: { models: a.models } }); return `${r.count} models offered`; } },
   { name: 'offer_skills', description: 'Tell the panel which skills you have, so the designer can pick one per note.', inputSchema: S({ skills: { type: 'array', items: S({ name: { type: 'string' }, description: { type: 'string' } }, ['name']) } }, ['skills']),
     run: async a => { const r = await api('/skills', { method: 'POST', body: { skills: a.skills } }); return `${r.count} skills offered`; } },
 ];
+
+async function runJob(noteId, kind, payload) {
+  const job = await api(`/annotations/${noteId}/job`, { method: 'POST', body: { kind, payload } });
+  for (let i = 0; i < 50; i++) { // under the client's tool timeout
+    await sleep(1000);
+    const it = await api(`/annotations/${noteId}`);
+    if (it.job?.id === job.id && it.job.status === 'done') return it.job.result;
+  }
+  await api(`/annotations/${noteId}/job/${job.id}`, { method: 'POST', body: { expire: true } }).catch(() => {});
+  return { error: 'the Figma panel didn\'t run this: it has to be open in the note\'s file. Ask the designer to open it, then try again.' };
+}
 
 async function waitAnswer(promptId, waitSec) {
   const until = Date.now() + Math.max(1, Math.min(Number(waitSec) || 45, 3600)) * 1000;

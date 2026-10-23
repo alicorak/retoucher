@@ -57,7 +57,7 @@ const cleanQuestions = qs => (Array.isArray(qs) ? qs : []).slice(0, 4).map(q => 
   question: String(q?.question ?? '').slice(0, 500), header: String(q?.header ?? '').slice(0, 40), multiSelect: !!q?.multiSelect,
   options: (Array.isArray(q?.options) ? q.options : []).slice(0, 6).map(o => ({ label: String(o?.label ?? '').slice(0, 120), description: String(o?.description ?? '').slice(0, 400) })),
 })).filter(q => q.question);
-const PATCH_KEYS =['set', 'remove', 'move', 'swap', 'bind', 'variables'];
+const PATCH_KEYS = ['set', 'remove', 'move', 'swap', 'bind', 'variables', 'text'];
 
 // Figma REST token for reading comments: FIGMA_TOKEN, or { "figmaToken": "..." } in data/config.json
 function figmaToken() {
@@ -199,6 +199,19 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // models the watching session can hand a note to (posted by `fa models`): [{ id, name }], shown in the panel's Options
+    if (url.pathname === '/models') {
+      if (req.method === 'GET') return send(res, 200, db.models || []);
+      if (req.method === 'POST') {
+        if (fromPage(req)) return send(res, 403, { error: 'local only' });
+        const b = await readBody(req);
+        db.models = (Array.isArray(b.models) ? b.models : []).slice(0, 20).filter(m => m && m.id && /^[A-Za-z0-9._:-]{1,60}$/.test(m.id))
+          .map(m => ({ id: String(m.id), name: String(m.name || m.id).slice(0, 60) }));
+        save();
+        return send(res, 200, { ok: true, count: db.models.length });
+      }
+    }
+
     // permission prompts: the hook creates one and waits, the panel answers it
     if (parts[0] === 'permissions') {
       for (const [k, p] of perms) if (Date.now() - p.at > 15 * 60 * 1000) perms.delete(k);
@@ -329,7 +342,8 @@ const server = http.createServer(async (req, res) => {
         // Figma comments: 'apply' them, or 'summarize' them into themes and a plan
         useComments: b.useComments === 'summarize' ? 'summarize' : b.useComments ? 'apply' : null,
         // which model works on the note (a subagent), whether Claude shows a plan first, and a skill to use
-        model: ['opus', 'sonnet', 'haiku', 'fable'].includes(b.model) ? b.model : null,
+        model: b.model && /^[A-Za-z0-9._:-]{1,60}$/.test(b.model) ? String(b.model) : null,
+        modelName: b.model && b.modelName ? str(b.modelName, 60) : null,
         planFirst: !!b.planFirst,
         skill: b.skill ? str(b.skill, 120) : null,
         // 'file': the note is about every page of the file, not the selection or the current page
@@ -397,6 +411,34 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, publicItem(it));
       }
 
+      // a job the panel runs inside Figma (it can load the designer's local fonts): { kind: 'fonts' | 'text', payload }
+      if (req.method === 'POST' && parts[2] === 'job' && parts.length === 3) {
+        const b = await readBody(req);
+        if (!['fonts', 'text'].includes(b.kind)) return send(res, 400, { error: 'kind: fonts|text' });
+        it.job = { id: String(Date.now()), kind: b.kind, payload: b.payload || {}, status: 'pending', createdAt: now() };
+        save();
+        return send(res, 201, it.job);
+      }
+      // the panel's result ({ result }), or the agent giving up on a job nobody ran ({ expire: true })
+      if (req.method === 'POST' && parts[2] === 'job' && parts.length === 4) {
+        const b = await readBody(req);
+        if (!it.job || it.job.id !== parts[3]) return send(res, 404, { error: 'no such job' });
+        if (it.job.status !== 'pending') return send(res, 409, { error: 'already ' + it.job.status });
+        if (b.expire) { it.job.status = 'expired'; save(); return send(res, 200, it.job); }
+        it.job.status = 'done';
+        it.job.result = b.result || {};
+        // the job's revert goes in front of the Undo patch: the latest change is undone first
+        const revert = it.job.result.revert?.text || [];
+        if (revert.length) {
+          it.patch = it.patch || Object.fromEntries(PATCH_KEYS.map(k => [k, []]));
+          it.patch.text = [...revert, ...(it.patch.text || [])];
+          it.reverted = false;
+        }
+        it.updatedAt = now();
+        save();
+        return send(res, 200, it.job);
+      }
+
       // before/after screenshots saved by Claude
       if (req.method === 'POST' && parts[2] === 'snapshot') {
         const b = await readBody(req);
@@ -411,7 +453,10 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'POST' && parts[2] === 'patch') {
         const b = await readBody(req);
         if (!b.patch || !PATCH_KEYS.some(k => Array.isArray(b.patch[k]) && b.patch[k].length)) return send(res, 400, { error: `patch needs one of: ${PATCH_KEYS.join(', ')}` });
+        // text reverts recorded by panel jobs stay: they are not part of what the agent sends
+        const keepText = it.patch?.text || [];
         it.patch = Object.fromEntries(PATCH_KEYS.map(k => [k, Array.isArray(b.patch[k]) ? b.patch[k] : []]));
+        it.patch.text = [...it.patch.text, ...keepText];
         it.reverted = false;
         it.updatedAt = now();
         save();

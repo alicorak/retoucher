@@ -331,6 +331,123 @@ async function loadTextFonts(node) {
   }
 }
 
+// ---------- text jobs from the agent ----------
+// The agent edits Figma through the Figma MCP, which can't load fonts installed on this computer (and so can't
+// change, resize or even restyle text set in them). This plugin runs inside the designer's Figma and can: the agent
+// sends text changes as a job, the panel runs it here and sends back what changed plus a revert for Undo.
+async function listFonts(query) {
+  const q = String(query || '').toLowerCase().trim();
+  const families = new Map();
+  for (const f of await figma.listAvailableFontsAsync()) {
+    const n = f.fontName;
+    if (q && !n.family.toLowerCase().includes(q)) continue;
+    if (!families.has(n.family)) families.set(n.family, []);
+    families.get(n.family).push(n.style);
+  }
+  return [...families].slice(0, 60).map(([family, styles]) => ({ family, styles }));
+}
+
+// "Bold Italic" → { weight: 700, italic: true }, so a style can be matched to the closest one in another family
+const WEIGHTS = [[/thin|hairline/, 100], [/extra ?light|ultra ?light/, 200], [/light/, 300], [/medium/, 500], [/semi ?bold|demi ?bold/, 600],
+  [/extra ?bold|ultra ?bold/, 800], [/black|heavy/, 900], [/bold/, 700]];
+function styleInfo(style) {
+  const s = String(style).toLowerCase();
+  const w = WEIGHTS.find(([re]) => re.test(s));
+  return { weight: w ? w[1] : 400, italic: /italic|oblique/.test(s) };
+}
+function closestStyle(fromStyle, styles) {
+  const want = styleInfo(fromStyle);
+  let best = null, bestScore = Infinity;
+  for (const st of styles) {
+    const got = styleInfo(st);
+    const score = Math.abs(got.weight - want.weight) + (got.italic === want.italic ? 0 : 1000);
+    if (score < bestScore) { best = st; bestScore = score; }
+  }
+  return best;
+}
+
+async function textNodesIn(op) {
+  const out = [];
+  for (const id of [...(op.nodeIds || []), ...(op.within ? [op.within] : [])]) {
+    const node = await figma.getNodeByIdAsync(id);
+    if (!node) continue;
+    let page = node;
+    while (page && page.type !== 'PAGE') page = page.parent;
+    if (page && page.loadAsync) await page.loadAsync();
+    if (node.type === 'TEXT') out.push(node);
+    else if ('findAllWithCriteria' in node) out.push(...node.findAllWithCriteria({ types: ['TEXT'] }));
+  }
+  return [...new Map(out.map(n => [n.id, n])).values()];
+}
+
+// op: { nodeIds?, within?, family?, style?, fontSize?, fontSizeDelta?, letterSpacing?, lineHeight?,
+//       match?: { family?, style?, minSize?, maxSize? } }
+const SEG_FIELDS = ['fontName', 'fontSize', 'letterSpacing', 'lineHeight'];
+async function runTextOps(ops) {
+  const result = { changedLayers: 0, changedRanges: 0, skipped: [], revert: { text: [] } };
+  const families = new Map();
+  const stylesOf = async family => {
+    if (!families.has(family)) families.set(family, ((await listFonts(family)).find(f => f.family === family) || { styles: [] }).styles);
+    return families.get(family);
+  };
+  for (const op of ops || []) {
+    if (op.family && !(await stylesOf(op.family)).length) { result.skipped.push({ op: op.family, reason: `font "${op.family}" isn't available in this Figma` }); continue; }
+    for (const node of await textNodesIn(op)) {
+      if (node.hasMissingFont) { result.skipped.push({ id: node.id, name: node.name, reason: 'uses a font that is missing here' }); continue; }
+      const segs = node.getStyledTextSegments(SEG_FIELDS);
+      const before = [];
+      let touched = false;
+      try {
+        for (const seg of segs) {
+          const m = op.match || {};
+          if (m.family && seg.fontName.family !== m.family) continue;
+          if (m.style && seg.fontName.style !== m.style) continue;
+          if (m.minSize && seg.fontSize < m.minSize) continue;
+          if (m.maxSize && seg.fontSize > m.maxSize) continue;
+          await figma.loadFontAsync(seg.fontName);
+          before.push({ start: seg.start, end: seg.end, fontName: seg.fontName, fontSize: seg.fontSize, letterSpacing: seg.letterSpacing, lineHeight: seg.lineHeight });
+          if (op.family || op.style) {
+            const family = op.family || seg.fontName.family;
+            const style = op.style || closestStyle(seg.fontName.style, await stylesOf(family)) || seg.fontName.style;
+            await figma.loadFontAsync({ family, style });
+            node.setRangeFontName(seg.start, seg.end, { family, style });
+          }
+          if (typeof op.fontSize === 'number') node.setRangeFontSize(seg.start, seg.end, op.fontSize);
+          else if (typeof op.fontSizeDelta === 'number') node.setRangeFontSize(seg.start, seg.end, Math.max(1, seg.fontSize + op.fontSizeDelta));
+          if (op.letterSpacing) node.setRangeLetterSpacing(seg.start, seg.end, op.letterSpacing);
+          if (op.lineHeight) node.setRangeLineHeight(seg.start, seg.end, op.lineHeight);
+          touched = true;
+          result.changedRanges++;
+        }
+      } catch (e) { result.skipped.push({ id: node.id, name: node.name, reason: e.message }); }
+      if (touched) { result.changedLayers++; result.revert.text.push({ id: node.id, segments: before }); }
+    }
+  }
+  figma.commitUndo();
+  return result;
+}
+
+// puts text ranges back as they were (the revert of a text job)
+async function revertText(entries, result) {
+  for (const t of entries || []) {
+    const node = await figma.getNodeByIdAsync(t.id);
+    if (!node || node.type !== 'TEXT') { result.missing.push(t.id); continue; }
+    try {
+      await loadTextFonts(node);
+      for (const s of t.segments || []) {
+        const end = Math.min(s.end, node.characters.length);
+        if (s.start >= end) continue;
+        await figma.loadFontAsync(s.fontName);
+        node.setRangeFontName(s.start, end, s.fontName);
+        if (s.fontSize) node.setRangeFontSize(s.start, end, s.fontSize);
+        if (s.letterSpacing) node.setRangeLetterSpacing(s.start, end, s.letterSpacing);
+        if (s.lineHeight) node.setRangeLineHeight(s.start, end, s.lineHeight);
+      }
+      result.restored++;
+    } catch (e) { result.errors.push(t.id + ' text: ' + e.message); }
+  }
+}
+
 async function applyPatch(patch) {
   const result = { restored: 0, removed: 0, missing: [], errors: [] };
   // moves first: a layer is put back into its old parent (and size) before the layers that held it are removed
@@ -355,6 +472,7 @@ async function applyPatch(patch) {
       result.restored++;
     } catch (e) { result.errors.push(sw.id + ' swap: ' + e.message); }
   }
+  await revertText(patch.text, result);
   for (const entry of patch.set || []) {
     const node = await figma.getNodeByIdAsync(entry.id);
     if (!node) { result.missing.push(entry.id); continue; }
@@ -429,6 +547,14 @@ figma.ui.onmessage = async msg => {
     const markers = await figma.clientStorage.getAsync('markers');
     figma.ui.postMessage({ type: 'markers-pref', value: markers !== false });
     figma.ui.postMessage({ type: 'prefs', pairKey: await figma.clientStorage.getAsync('pairKey'), optionsOpen: await figma.clientStorage.getAsync('optionsOpen'), size: await figma.clientStorage.getAsync('size') });
+  }
+  if (msg.type === 'run-job') {
+    let result;
+    try {
+      result = msg.kind === 'fonts' ? { fonts: await listFonts(msg.payload && msg.payload.query) } : await runTextOps(msg.payload && msg.payload.ops);
+    } catch (e) { result = { error: e.message }; }
+    if (msg.kind === 'text' && result.changedLayers) figma.notify(`Claude changed text in ${result.changedLayers} layer${result.changedLayers > 1 ? 's' : ''}`);
+    figma.ui.postMessage({ type: 'job-result', id: msg.id, jobId: msg.jobId, result });
   }
   if (msg.type === 'save-file-key') { await saveKey(msg.key); pushContext(); }
   if (msg.type === 'set-pref' && ['pairKey', 'optionsOpen', 'size'].includes(msg.key)) await figma.clientStorage.setAsync(msg.key, msg.value);

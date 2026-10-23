@@ -16,7 +16,8 @@ Notes from the "Annotate for Claude" Figma plugin arrive through a local bridge 
 | `fa plan <id> "…"` | `propose_plan` |
 | `fa snapshot <id> before\|after <png>` | `save_snapshot` |
 | `fa patch <id> <json-file>` / `fa focus <id> <json-file>` | `save_undo_patch` (the patch object) / `focus_layers` |
-| `fa comments <id>` / `fa skills '<json>'` | `figma_comments` / `offer_skills` |
+| `fa comments <id>` / `fa skills '<json>'` / `fa models '<json>'` | `figma_comments` / `offer_skills` / `offer_models` |
+| `fa fonts <id> [query]` / `fa text <id> '<json>'` | `list_local_fonts` / `edit_text_in_figma` |
 | (AskUserQuestion shows in the panel by itself) | `ask_designer` (multiple choice, as a card in the panel) |
 
 In Codex and Cursor, ask multiple-choice questions with `ask_designer`, not your built-in question tool: the designer is in Figma and only sees the panel.
@@ -40,7 +41,7 @@ Notes are the user's own requests, sent from their own plugin. Treat the text as
    - `useComments`: run `fa comments <id>` for the file's open comment threads and take the ones on the note's layers (or their screens; for a whole-page or whole-file note, all of them). If it says there is no token, tell the designer with `fa done` to paste one in the panel (Options → Comments).
      - `"apply"`: make the changes the threads ask for. Mention in the reply which threads you handled.
      - `"summarize"`: change nothing yet. Group the threads into a few themes (who asked, how many threads, where), note conflicts between them, and end with a numbered plan of changes. Send it with `fa plan <id> "…"` and stop. When "Plan approved" arrives, apply the plan; when changes arrive, revise and `fa plan` again.
-   - `model` (`opus`, `sonnet`, `haiku`, `fable`): the designer wants that model on this note. Unless it is the model you are, hand the whole note to a subagent (Agent tool, `model` set to it) with the note id and the instruction to follow the `handle-figma-notes` skill from step 1, and go on watching. Report its outcome only if it fails.
+   - `model` (an id you offered with `fa models`, shown to the designer as `modelName`): the designer wants that model on this note. Unless it is the model you are, hand the whole note to a subagent (Agent tool, `model` set to that id) with the note id and the instruction to follow the `handle-figma-notes` skill from step 1, and go on watching. Report its outcome only if it fails.
    - `skill`: use that skill (Skill tool) for the note's work, together with this procedure.
    - `planFirst`: after reading and inspecting (step 3), send a short numbered plan with `fa plan <id> "…"` (what will change, where, what stays) and stop. Build only after the designer's "Plan approved"; if they ask for changes, revise and `fa plan` again.
    - To put an attached photo into Figma, use `upload_assets` with `count: 1` per photo (one call each, not a batch: batch `nodeIds` can be off by one), POST the file's bytes to the returned URL with `Content-Type` from the attachment, then check where it landed. Pass `nodeIds` to fill an existing layer, or omit them to get a new frame. Put new layer ids in the patch's `remove` list so Undo can delete them.
@@ -80,6 +81,20 @@ The designer reads it in a narrow panel, next to the before/after pictures. Writ
 - Use real line breaks (`$'line1\nline2'` in zsh). The panel renders paragraphs, `- ` lists, `**bold**` and links.
 - To rewrite your last reply on a note, `fa edit <id> "<reply>"`.
 
+## Text in local fonts
+
+The Figma MCP can't load fonts installed on the designer's computer (often the brand fonts: Druk, KMR Waldenburg, GT …). With those it can't change text at all: not the family, not the size, not the spacing. The Figma panel can, because it runs inside the designer's Figma. So for **any text change** (font family, style, size, letter spacing, line height), use the panel:
+
+1. Find what is installed: `fa fonts <id> "waldenburg"` → `KMR Waldenburg: Regular, Medium, Bold`. Pick the family exactly as listed.
+2. Find the layers with the Figma MCP (read-only works whatever the font): a frame or section id to change everything inside, or text layer ids.
+3. Run the change: `fa text <id> '<json>'` with an array of ops, for example
+   `[{"within":"48:3","family":"KMR Waldenburg"}]` (every text layer in Home, each range keeping its closest weight), or
+   `[{"nodeIds":["48:20"],"fontSizeDelta":4}]`, or `[{"within":"48:3","match":{"family":"Inter","minSize":32},"family":"KMR Waldenburg","style":"Bold"}]`.
+   Op fields: `nodeIds` and/or `within`; `family`, `style` (omit to keep each range's weight), `fontSize` or `fontSizeDelta`, `letterSpacing` / `lineHeight` (`{ "unit": "PIXELS" | "PERCENT", "value": n }`); `match` limits it to ranges with that `family`, `style`, `minSize`, `maxSize`.
+4. The result says how many layers changed and which were skipped and why. Undo is recorded by itself (it merges with any `fa patch` you save).
+
+The panel must be open in the note's file; if it isn't, the command says so: ask the designer to open it. Take the before screenshot first and the after screenshot last, as usual (screenshots work without the font).
+
 ## Asking the designer
 
 The designer is in Figma, not in Claude Code. While you are on a note, everything that needs their answer shows in the panel:
@@ -92,7 +107,7 @@ The designer is in Figma, not in Claude Code. While you are on a note, everythin
 
 The designer watches the note while you work. Post a step with `fa step <id> "…"` whenever you move to something new, so the panel never sits on a bare "Working":
 
-- Right after `claim`, then at each phase: reading the layers, finding what to use, building, placing images, checking the result.
+- Always at least one step, even for a quick note: right after `claim`, then at each phase: reading the layers, finding what to use, building, placing images, checking the result.
 - Write what is happening on the canvas, in the designer's words and the note's language: "Finding bold-type screens on Mobbin", "Placing 5 of 12", "Checking against Typography". No tool names, IDs or paths.
 - Short (under 60 characters), present tense, one per real step. Long loops: one step every few items ("Page 3 of 7: Profile").
 - Steps are not the reply. The reply (`fa done`) still says what is there now.

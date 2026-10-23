@@ -9,6 +9,9 @@
 //   fa edit <id> "message"      rewrite Claude's last reply on the note
 //   fa step <id> "what now"     live progress line shown under "Working" in the plugin
 //   fa plan <id> "plan"         show a plan for the designer to approve (Approve / Change), and wait
+//   fa fonts <id> [query]       fonts installed on the designer's computer, as Figma sees them (run by the panel)
+//   fa text <id> <json-file>    change text in Figma through the panel, local fonts included; Undo is recorded
+//   fa models '<json>'          tell the panel which models this session can hand a note to: [{"id","name"}]
 //   fa skills '<json>'          tell the panel which skills this session has: [{"name","description"}]
 //   fa snapshot <id> before|after <png>   store a before/after screenshot (shown in the plugin)
 //   fa patch <id> <json-file>   store the revert patch so the plugin can Undo (see CLAUDE.md)
@@ -30,6 +33,19 @@ async function api(path, opts = {}) {
   return j;
 }
 
+// jobs run by the Figma panel (it can load local fonts); wait for its answer
+async function runJob(id, kind, payload) {
+  const job = await api(`/annotations/${id}/job`, { method: 'POST', body: { kind, payload } });
+  for (let i = 0; i < 90; i++) {
+    await new Promise(r => setTimeout(r, 1000));
+    const it = await api(`/annotations/${id}`);
+    if (it.job?.id === job.id && it.job.status === 'done') return it.job.result;
+  }
+  await api(`/annotations/${id}/job/${job.id}`, { method: 'POST', body: { expire: true } }).catch(() => {});
+  const it = await api(`/annotations/${id}`).catch(() => ({}));
+  throw new Error(`the Figma panel didn't run this. It has to be open in "${it.fileName || 'the note\'s file'}" (these changes run inside Figma, where the local fonts are). Ask the designer to open it, then try again.`);
+}
+
 const oneLine = s => String(s).replace(/\s+/g, ' ').slice(0, 140);
 const batchLabel = it => (it.batchId ? ` [batch ${it.batchId}${it.batchMode === 'parallel' ? ', parallel' : ''}]` : '')
   + (it.attachments?.length ? ` [+${it.attachments.length} file${it.attachments.length > 1 ? 's' : ''}]` : '')
@@ -37,7 +53,7 @@ const batchLabel = it => (it.batchId ? ` [batch ${it.batchId}${it.batchMode === 
   + (it.mentions?.length ? ` [@ ${it.mentions.map(m => m.name).join(', ')}]` : '')
   + (it.library ? ` [library ${it.library}]` : '')
   + (it.useComments ? ` [comments: ${it.useComments === 'summarize' ? 'summarize' : 'apply'}]` : '')
-  + (it.model ? ` [model ${it.model}]` : '') + (it.planFirst ? ' [plan first]' : '') + (it.skill ? ` [skill ${it.skill}]` : '');
+  + (it.model ? ` [model ${it.modelName || it.model} (id ${it.model})]` : '') + (it.planFirst ? ' [plan first]' : '') + (it.skill ? ` [skill ${it.skill}]` : '');
 const nodesLabel = it => it.scope === 'file' ? `whole file "${it.fileName || '?'}"` : it.nodes.map(n => n.region ? `area ${n.w}×${n.h} in "${n.region.frameName || 'page'}"` : `${n.name} (${n.id})`).join(', ') || `whole page "${it.pageName || '?'}"`;
 
 async function main() {
@@ -93,6 +109,28 @@ async function main() {
       await api(`/annotations/${a}/messages`, { method: 'POST', body: { from: 'claude', text, status: 'question', kind: 'plan' } });
       return console.log(`#${a} plan shown, waiting for approval`);
     }
+    case 'fonts': {
+      const r = await runJob(a, 'fonts', { query: rest.join(' ') });
+      if (r.error) throw new Error(r.error);
+      if (!r.fonts.length) return console.log('(no matching fonts on the designer\'s computer)');
+      for (const f of r.fonts) console.log(`${f.family}: ${f.styles.join(', ')}`);
+      return;
+    }
+    case 'text': {
+      const src = rest.join(' ');
+      if (!src) throw new Error('usage: fa text <id> <json-file>  (an array of ops, see the skill)');
+      const json = JSON.parse(fs.existsSync(src) ? fs.readFileSync(src, 'utf8') : src);
+      const r = await runJob(a, 'text', { ops: Array.isArray(json) ? json : json.ops });
+      if (r.error) throw new Error(r.error);
+      console.log(`#${a} changed ${r.changedLayers} text layer${r.changedLayers === 1 ? '' : 's'} (${r.changedRanges} ranges); Undo recorded`);
+      for (const k of r.skipped || []) console.log(`  skipped ${k.name ? `${k.name} (${k.id})` : k.id || k.op}: ${k.reason}`);
+      return;
+    }
+    case 'models': {
+      if (!a) throw new Error(`usage: fa models '[{"id":"opus","name":"Claude Opus 5.5"}]'`);
+      const r = await api('/models', { method: 'POST', body: { models: JSON.parse([a, ...rest].join(' ')) } });
+      return console.log(`${r.count} models offered in the panel`);
+    }
     case 'skills': {
       if (!a) throw new Error(`usage: fa skills '[{"name":"…","description":"…"}]'`);
       const skills = JSON.parse([a, ...rest].join(' '));
@@ -144,7 +182,7 @@ async function main() {
       }
     }
     default:
-      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|edit|step|plan|skills|comments|unpair|watch');
+      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|edit|step|plan|fonts|text|models|skills|comments|unpair|watch');
   }
 }
 

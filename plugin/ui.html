@@ -304,9 +304,9 @@
       <input id="figmaToken" type="password" placeholder="Figma token (figd_…)" autocomplete="off" spellcheck="false" title="Figma → Settings → Security → Personal access tokens, scope File comments: read. Stays on your computer.">
       <button class="btn ghost sm" id="tokenSave" type="button">Save</button>
     </div>
-    <div class="orow">
-      <span class="lbl" title="Default: the model of your Claude Code session. Another model works on this note as a helper agent.">Model</span>
-      <select id="model"><option value="">Session default</option><option value="opus">Opus</option><option value="sonnet">Sonnet</option><option value="haiku">Haiku</option><option value="fable">Fable</option></select>
+    <div class="orow" id="modelRow" hidden>
+      <span class="lbl" title="Default: the model of the session that is watching. Another model works on this note as a helper agent.">Model</span>
+      <select id="model"><option value="">Session default</option></select>
     </div>
     <div class="orow" id="skillRow" hidden>
       <span class="lbl" title="A skill from your Claude Code session that Claude uses for this note">Skill</span>
@@ -457,6 +457,7 @@ window.onmessage = e => {
   if (m.type === 'mention-results') showMentions(m.q, m.results || []);
   if (m.type === 'markers-pref') { markersOn = m.value; $('markers').checked = m.value; syncMarkers(); }
   if (m.type === 'patch-result') onPatchResult(m);
+  if (m.type === 'job-result') onJobResult(m);
   if (m.type === 'targets-added') onTargetsAdded(m.targets || []);
   if (m.type === 'picker-open') openPicker(m.backdrop);
   if (m.type === 'picker-result') onPickerResult(m.targets || []);
@@ -784,6 +785,7 @@ async function currentDraft() {
     variations: Number(getVariations()),
     useComments: getComments() || null,
     model: $('model').value || null,
+    modelName: $('model').value ? $('model').selectedOptions[0].textContent : null,
     skill: $('skill').value || null,
     planFirst: $('planFirst').checked,
     scope: wholeFile() ? 'file' : null,
@@ -992,11 +994,12 @@ async function refresh(force) {
     const key = effectiveKey();
     const r = await api('/annotations' + (key ? `?fileKey=${key}` : ''));
     items = await r.json(); // oldest first, like a chat
+    runJobs();
     perms = await (await api('/permissions?status=pending')).json();
     renderPerms();
     setOnline(true, !!h.claude);
     hasCommentsToken = !!h.comments; showTokenRow();
-    if (h.claude) loadSkills();
+    if (h.claude) { loadSkills(); loadModels(); }
     const sig = JSON.stringify(items);
     if (force || sig !== lastSig) { lastSig = sig; renderList(); syncMarkers(); }
   } catch { setOnline(false); }
@@ -1015,6 +1018,20 @@ async function loadSkills() {
   $('skillRow').hidden = !list.length;
 }
 
+// ---------- models the watching session can hand a note to (fa models), with their real names ----------
+let modelsSig = null;
+async function loadModels() {
+  const list = await (await api('/models')).json().catch(() => []);
+  const sig = JSON.stringify(list);
+  if (sig === modelsSig) return;
+  modelsSig = sig;
+  const cur = $('model').value;
+  $('model').innerHTML = '<option value="">Session default</option>' + list.map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+  $('model').value = list.some(m => m.id === cur) ? cur : '';
+  $('modelRow').hidden = !list.length;
+  optionsSummary();
+}
+
 // ---------- Figma token for comments: asked for only when "Use Figma comments" is on and the bridge has none ----------
 let hasCommentsToken = true;
 function showTokenRow() { $('tokenRow').hidden = hasCommentsToken || !getComments(); }
@@ -1024,6 +1041,25 @@ $('tokenSave').onclick = async () => {
   if (j.error) return notify(j.error);
   $('figmaToken').value = ''; hasCommentsToken = !!j.comments; showTokenRow(); notify('Token saved on this computer');
 };
+
+// ---------- jobs: text changes the agent can't make through the Figma MCP (local fonts), run here in Figma ----------
+const jobsRunning = new Set();
+function runJobs() {
+  const key = effectiveKey();
+  for (const it of items) {
+    const j = it.job;
+    if (!j || j.status !== 'pending' || jobsRunning.has(j.id) || !key || it.fileKey !== key) continue;
+    jobsRunning.add(j.id);
+    post({ type: 'run-job', id: it.id, jobId: j.id, kind: j.kind, payload: j.payload });
+  }
+}
+async function onJobResult(m) {
+  try {
+    await api(`/annotations/${m.id}/job/${m.jobId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ result: m.result }) });
+  } catch { notify('Could not send the result to Claude: bridge off'); }
+  jobsRunning.delete(m.jobId);
+  refresh(true);
+}
 
 // ---------- permission prompts from Claude Code (bridge/permission-hook.mjs) ----------
 let perms = [], permSig = '';
@@ -1159,7 +1195,7 @@ function itemHtml(it) {
   const thread = it.thread.map((t, i) => `<div class="msg ${t.from}${t.kind === 'plan' ? ' plan' : ''}">${t.from === 'system' ? '' : `<small>${t.from === 'claude' ? (t.kind === 'plan' ? 'Claude · Plan' : 'Claude') : 'You'}</small>`}${t.from === 'claude' ? richText(t.text) : esc(t.text)}${lastPlan && i === it.thread.length - 1 ? `<div class="pa"><button class="btn ghost sm" type="button" data-plan-change="${it.id}">Change something</button><span class="grow"></span><button class="btn primary sm" type="button" data-plan-ok="${it.id}">Approve plan</button></div>` : ''}</div>`).join('');
   const meta = [it.priority === 'urgent' ? 'urgent' : '', it.variations > 1 ? `${it.variations} versions` : '', it.library ? `library: ${it.library === 'local' ? 'this file' : it.library}` : '',
     (it.mentions || []).length ? '@ ' + it.mentions.map(m => m.name).join(', ') : '', it.useComments ? (it.useComments === 'summarize' ? 'summarize comments' : 'apply comments') : '',
-    it.model ? it.model : '', it.skill ? 'skill: ' + it.skill : '', it.planFirst ? 'plan first' : '', it.batchMode === 'parallel' ? 'parallel' : ''].filter(Boolean).join(' · ');
+    it.model ? (it.modelName || it.model) : '', it.skill ? 'skill: ' + it.skill : '', it.planFirst ? 'plan first' : '', it.batchMode === 'parallel' ? 'parallel' : ''].filter(Boolean).join(' · ');
   const showCmp = it.status === 'done' && it.hasBefore && it.hasAfter;
   const canUndo = it.status === 'done' && it.patch && !it.reverted;
   const replyOpen = !it.reverted && (it.status === 'question' || openReplies.has(it.id) || replyDrafts[it.id]);
