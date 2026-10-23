@@ -39,7 +39,7 @@ const noteLine = it => {
   const fromUser = last?.from === 'user';
   const kind = fromUser ? (it.status === 'working' ? ' (message while working)' : ' (follow-up)') : '';
   const opts = [it.scope === 'file' ? 'whole file' : '', it.variations > 1 ? `${it.variations} versions` : '', it.useComments ? `comments: ${it.useComments}` : '',
-    it.model ? `model ${it.modelName || it.model} (id ${it.model})` : '', it.planFirst ? 'plan first' : '', it.skill ? `skill ${it.skill}` : '', it.priority === 'urgent' ? 'urgent' : ''].filter(Boolean).join(', ');
+    it.model ? `model ${it.modelName || it.model} (id ${it.model})` : '', it.planFirst ? 'plan first' : '', it.skill ? `skill ${it.skill}` : '', it.references ? `references: ${it.references.count} from Mobbin` : '', it.priority === 'urgent' ? 'urgent' : ''].filter(Boolean).join(', ');
   const where = it.scope === 'file' ? 'whole file' : it.nodes.length ? it.nodes.map(n => n.region ? `area in "${n.region.frameName || 'page'}"` : `${n.name} (${n.id})`).join(', ') : `page "${it.pageName || '?'}"`;
   return `#${it.id}${kind}${opts ? ` [${opts}]` : ''}: ${(fromUser ? last.text : it.note).replace(/\s+/g, ' ').slice(0, 300)} — ${where}`;
 };
@@ -54,6 +54,10 @@ async function newNotes() {
 const S = (props, required = []) => ({ type: 'object', properties: props, required, additionalProperties: false });
 const id = { type: 'string', description: 'Note id, e.g. "15"' };
 const text = d => ({ type: 'string', description: d });
+// pictures shown with a message (references, versions): [{ path, link?, caption? }]
+const imagesProp = { type: 'array', description: 'Pictures shown with the message, e.g. references: [{ path, link, caption }]', items: S({ path: { type: 'string' }, link: { type: 'string' }, caption: { type: 'string' } }, ['path']) };
+const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+const readImages = list => (list || []).map(im => ({ mime: MIME[String(im.path).split('.').pop().toLowerCase()] || 'image/png', data: fs.readFileSync(im.path).toString('base64'), link: im.link, caption: im.caption }));
 const TOOLS = [
   { name: 'wait_for_note', description: 'Wait for the next note, follow-up or message from the Figma panel. Returns as soon as something arrives, or after timeout_sec with "nothing yet": then call it again. While you call it, the panel shows "Claude ready". Notes already waiting are returned on the first call.',
     inputSchema: S({ timeout_sec: { type: 'number', description: 'How long to wait (default 45; keep under your client\'s tool timeout)' } }),
@@ -76,14 +80,14 @@ const TOOLS = [
     run: async a => { await api(`/annotations/${a.id}`, { method: 'PATCH', body: { status: 'working' } }); return `#${a.id} working`; } },
   { name: 'add_step', description: 'Show what you are doing now under "Working" in the panel. Short, in the designer\'s words.', inputSchema: S({ id, text: text('e.g. "Placing 5 of 12"') }, ['id', 'text']),
     run: async a => { await api(`/annotations/${a.id}/progress`, { method: 'POST', body: { text: a.text } }); return 'ok'; } },
-  { name: 'finish_note', description: 'Reply and mark the note done. Markdown: short first line, a few "- " bullets, [name](url) links.', inputSchema: S({ id, text: text('The reply') }, ['id', 'text']),
-    run: async a => { await api(`/annotations/${a.id}/messages`, { method: 'POST', body: { from: 'claude', text: a.text, status: 'done' } }); return `#${a.id} done`; } },
+  { name: 'finish_note', description: 'Reply and mark the note done. Markdown: short first line, a few "- " bullets, [name](url) links. Optional pictures (references) shown under the reply.', inputSchema: S({ id, text: text('The reply'), images: imagesProp }, ['id', 'text']),
+    run: async a => { await api(`/annotations/${a.id}/messages`, { method: 'POST', body: { from: 'claude', text: a.text, status: 'done', images: readImages(a.images) } }); return `#${a.id} done`; } },
   { name: 'ask_in_note', description: 'Ask the designer an open question in the note and stop; the answer arrives later as a follow-up (wait_for_note).', inputSchema: S({ id, text: text('The question') }, ['id', 'text']),
     run: async a => { await api(`/annotations/${a.id}/messages`, { method: 'POST', body: { from: 'claude', text: a.text, status: 'question' } }); return `#${a.id} waiting for the designer`; } },
   { name: 'propose_plan', description: 'Show a plan with Approve plan / Change something buttons and stop; approval or changes arrive as a follow-up.', inputSchema: S({ id, text: text('The plan, numbered, in markdown') }, ['id', 'text']),
     run: async a => { await api(`/annotations/${a.id}/messages`, { method: 'POST', body: { from: 'claude', text: a.text, status: 'question', kind: 'plan' } }); return `#${a.id} plan shown`; } },
-  { name: 'send_message', description: 'Write in the note without changing its status.', inputSchema: S({ id, text: text('The message') }, ['id', 'text']),
-    run: async a => { await api(`/annotations/${a.id}/messages`, { method: 'POST', body: { from: 'claude', text: a.text } }); return 'ok'; } },
+  { name: 'send_message', description: 'Write in the note without changing its status, optionally with pictures.', inputSchema: S({ id, text: text('The message'), images: imagesProp }, ['id', 'text']),
+    run: async a => { await api(`/annotations/${a.id}/messages`, { method: 'POST', body: { from: 'claude', text: a.text, images: readImages(a.images) } }); return 'ok'; } },
   { name: 'rewrite_reply', description: 'Replace your last reply on the note.', inputSchema: S({ id, text: text('The new reply') }, ['id', 'text']),
     run: async a => { await api(`/annotations/${a.id}/messages`, { method: 'POST', body: { from: 'claude', text: a.text, replaceLast: true } }); return 'ok'; } },
   { name: 'ask_designer', description: 'Ask 1–4 multiple-choice questions as a card in the Figma panel and wait for the answers (the designer can also write their own). If they don\'t answer within wait_sec, returns a prompt_id: call check_answer with it.',

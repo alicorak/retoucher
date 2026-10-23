@@ -71,7 +71,7 @@ The panel's top-right tells you where things stand:
 
 1. Select one or more layers in Figma (or nothing, for the whole page).
 2. Write the change in the box at the bottom of the panel.
-3. Press **Send** (⌘↵).
+3. Press **Send** (↵). Shift+Enter starts a new line.
 
 Notes read like a chat, newest at the bottom. Each one shows its status: *Waiting → Claude is working → Done*, or *Needs your answer* when Claude has a question. Answer in the box under the note. Click a note to jump to its layers in Figma.
 
@@ -88,6 +88,7 @@ Tip: select the specific layer you mean. A selection that covers a whole row of 
 - **Questions and plans in the panel:** when Claude asks a multiple-choice question or wants a plan approved, it shows as a card in the panel. Pick answers (or write your own) and send, or *Approve plan* / *Change* with a note. Turn on *Options → Show a plan first* to see Claude's plan before anything changes.
 - **Model and skill per note:** *Options → Model* lists the models the watching agent can hand a note to, by their full names (for Claude Code: Claude Opus, Sonnet, Haiku, Fable); the chosen one works on the note as a helper agent. It's hidden when the agent can't pick a model. *Options → Skill* lists the skills of the Claude Code session that is watching.
 - **Permissions in the panel:** when the agent needs permission for a tool while working on a note, the question shows in the panel: *Allow once*, *Always allow* or *Decline*. In Cursor this covers MCP tools (the Figma edits); shell commands are still approved in Cursor. No need to go back to the agent. If the panel is closed, no note is being worked on, or nobody answers within 2 minutes, the agent asks in its own window as usual. *Always allow* saves the same rule the terminal's "don't ask again" would. The plugin's own `fa` command (it only talks to the local bridge) runs without asking.
+- **References from Mobbin:** *Options → Mobbin refs* (4, 8 or 12): the agent first finds matching screens on Mobbin, puts them next to your selection and shows them in its reply as thumbnails that open on Mobbin, then makes the change on a copy. Needs the Mobbin MCP connected to the agent.
 - **Your local fonts:** the Figma MCP can't load fonts installed on your computer (Druk, KMR Waldenburg, …), so it can't touch text set in them. The agent sends those changes to the panel instead, which runs them inside your Figma: font family (keeping each weight), size, letter spacing, line height, with Undo. Keep the panel open in that file.
 - **Live progress:** while Claude works, the note shows the step it is on and the last ones it finished. Afterwards they fold into "N steps".
 - **Selecting opens the note:** select a layer on the canvas and the note about it is highlighted in the panel.

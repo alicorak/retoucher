@@ -137,6 +137,12 @@
   .msg.claude li + li { margin-top: 2px; }
   .msg.claude b { font-weight: 600; }
   .msg .pa { display: flex; gap: 6px; margin-top: 8px; }
+  .refs { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 6px; margin-top: 8px; }
+  .ref { display: grid; gap: 2px; min-width: 0; }
+  .ref .ph { width: 100%; height: auto; aspect-ratio: 3 / 4; background-size: cover; background-position: top center; border-radius: 4px; }
+  .ref.linked { cursor: pointer; }
+  .ref.linked:hover .ph { outline: 2px solid var(--brand); }
+  .ref small { font-size: 10px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: none; }
   .msg .pa .grow { flex: 1; }
   .msg a { color: var(--brand); text-decoration: none; cursor: pointer; }
   .msg a:hover { text-decoration: underline; }
@@ -304,6 +310,10 @@
       <input id="figmaToken" type="password" placeholder="Figma token (figd_…)" autocomplete="off" spellcheck="false" title="Figma → Settings → Security → Personal access tokens, scope File comments: read. Stays on your computer.">
       <button class="btn ghost sm" id="tokenSave" type="button">Save</button>
     </div>
+    <div class="orow">
+      <span class="lbl" title="Claude first looks for this many matching screens on Mobbin, puts them next to your selection and shows them here, then makes the change on a copy">Mobbin refs</span>
+      <div class="seg" id="refs"><button data-v="" class="on" type="button">Off</button><button data-v="4" type="button">4</button><button data-v="8" type="button">8</button><button data-v="12" type="button">12</button></div>
+    </div>
     <div class="orow" id="modelRow" hidden>
       <span class="lbl" title="Default: the model of the session that is watching. Another model works on this note as a helper agent.">Model</span>
       <select id="model"><option value="">Session default</option></select>
@@ -341,7 +351,7 @@
       <span class="grow"></span>
       <span class="muted" id="fileHint"></span>
       <button class="btn ghost" id="queue" type="button" disabled title="Collect several notes, then send them together (⇧⌘↵)">Batch</button>
-      <button class="btn primary" id="send" type="button" disabled title="Send (⌘↵)">Send</button>
+      <button class="btn primary" id="send" type="button" disabled title="Send (↵). New line: ⇧↵">Send</button>
     </div>
     <input type="file" id="fileInput" multiple hidden>
   </div>
@@ -744,7 +754,7 @@ function onPickerResult(list) {
 function canCompose() { return $('note').value.trim() && effectiveKey(); }
 function updateSend() {
   $('send').disabled = !(online && canCompose());
-  $('send').title = !effectiveKey() ? 'Paste this file’s link above first' : !online ? 'Claude Code isn’t connected' : !$('note').value.trim() ? 'Write a note first' : 'Send (⌘↵)';
+  $('send').title = !effectiveKey() ? 'Paste this file’s link above first' : !online ? 'Claude Code isn’t connected' : !$('note').value.trim() ? 'Write a note first' : 'Send (↵). New line: ⇧↵';
   $('queue').disabled = !canCompose();
   $('addSel').disabled = !sel.nodes.length;
   $('batchSend').disabled = !online || !drafts.length;
@@ -761,6 +771,8 @@ function seg(id) {
 const getVariations = seg('variations');
 seg('scope');
 seg('comments');
+seg('refs');
+function getRefs() { return $('refs').querySelector('.on')?.dataset.v || ''; }
 function getComments() { return $('comments').querySelector('.on')?.dataset.v || ''; }
 // read from the button itself, so it also works for code that runs before this line
 function wholeFile() { return $('scope').querySelector('.on')?.dataset.v === 'file'; }
@@ -788,6 +800,7 @@ async function currentDraft() {
     modelName: $('model').value ? $('model').selectedOptions[0].textContent : null,
     skill: $('skill').value || null,
     planFirst: $('planFirst').checked,
+    references: getRefs() ? { source: 'mobbin', count: Number(getRefs()) } : null,
     scope: wholeFile() ? 'file' : null,
     attachments: files.map(p => ({ name: p.name, mime: p.mime, data: p.data })),
   };
@@ -804,6 +817,7 @@ function resetComposer() {
   $('scope').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === 'sel'));
   $('comments').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
   $('planFirst').checked = false;
+  $('refs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === ''));
   $('urgent').checked = false;
   optionsSummary(); renderTarget();
 }
@@ -822,7 +836,7 @@ function optionsSummary() {
   const on = [wholeFile() ? 'whole file' : '', v !== '1' ? v + ' versions' : '', $('library').value ? ($('library').value === 'local' ? 'this file only' : $('library').value) : '',
     getComments() ? (getComments() === 'summarize' ? 'summarize comments' : 'apply comments') : '',
     $('model').value ? $('model').selectedOptions[0].textContent : '', $('skill').value ? 'skill: ' + $('skill').value : '',
-    $('planFirst').checked ? 'plan first' : '', $('urgent').checked ? 'urgent' : ''].filter(Boolean);
+    $('planFirst').checked ? 'plan first' : '', getRefs() ? getRefs() + ' Mobbin refs' : '', $('urgent').checked ? 'urgent' : ''].filter(Boolean);
   $('optsBadge').hidden = !on.length;
   $('optLine').hidden = !on.length;
   $('optLine').textContent = on.join(' · ');
@@ -830,6 +844,7 @@ function optionsSummary() {
 }
 ['library', 'model', 'skill', 'planFirst', 'urgent'].forEach(id => $(id).addEventListener('change', optionsSummary));
 $('comments').addEventListener('click', () => setTimeout(() => { optionsSummary(); showTokenRow(); }));
+$('refs').addEventListener('click', () => setTimeout(optionsSummary));
 $('variations').addEventListener('click', () => setTimeout(optionsSummary));
 $('scope').addEventListener('click', () => setTimeout(() => { optionsSummary(); renderTarget(); }));
 
@@ -889,7 +904,12 @@ $('queue').onclick = addToBatch;
 $('note').addEventListener('input', () => { updateSend(); keepBottom(); });
 $('note').addEventListener('keydown', e => {
   if (mentionKey(e)) return;
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); e.shiftKey ? addToBatch() : submit(); }
+  if (e.key !== 'Enter' || e.isComposing || e.keyCode === 229) return; // 229: an input method is still composing
+  // Enter sends, Shift+Enter is a new line, ⌘⇧Enter adds to the batch
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey) { e.preventDefault(); addToBatch(); return; }
+  if (e.shiftKey) return;
+  e.preventDefault();
+  submit();
 });
 // when the note box grows, the newest note stays in view
 let wasAtBottom = true;
@@ -1177,7 +1197,7 @@ $('helpCopy').onclick = () => {
 };
 
 const LABEL = { pending: 'Waiting', working: 'Working', question: 'Needs answer', done: 'Done' };
-const staticKind = kind => /^(att|t)\d+$/.test(kind);
+const staticKind = kind => /^(att|t|m)\d+$/.test(kind);
 const imgKey = (it, kind) => staticKind(kind) ? `${it.id}:${kind}` : `${it.id}:${kind}:${it.updatedAt}`;
 const imgStyle = (it, kind) => { const u = imgCache.get(imgKey(it, kind)); return u ? `style="background-image:url(${u})"` : ''; };
 
@@ -1192,10 +1212,10 @@ function mediaHtml(it) {
 
 function itemHtml(it) {
   const lastPlan = it.status === 'question' && it.thread.at(-1)?.kind === 'plan';
-  const thread = it.thread.map((t, i) => `<div class="msg ${t.from}${t.kind === 'plan' ? ' plan' : ''}">${t.from === 'system' ? '' : `<small>${t.from === 'claude' ? (t.kind === 'plan' ? 'Claude · Plan' : 'Claude') : 'You'}</small>`}${t.from === 'claude' ? richText(t.text) : esc(t.text)}${lastPlan && i === it.thread.length - 1 ? `<div class="pa"><button class="btn ghost sm" type="button" data-plan-change="${it.id}">Change something</button><span class="grow"></span><button class="btn primary sm" type="button" data-plan-ok="${it.id}">Approve plan</button></div>` : ''}</div>`).join('');
+  const thread = it.thread.map((t, i) => `<div class="msg ${t.from}${t.kind === 'plan' ? ' plan' : ''}">${t.from === 'system' ? '' : `<small>${t.from === 'claude' ? (t.kind === 'plan' ? 'Claude · Plan' : 'Claude') : 'You'}</small>`}${t.from === 'claude' ? richText(t.text) : esc(t.text)}${(t.images || []).length ? `<div class="refs">${t.images.map(im => `<span class="ref${im.link ? ' linked' : ''}" ${im.link ? `data-href="${esc(im.link)}"` : ''} title="${esc(im.caption || im.link || '')}"><span class="ph" data-img="${it.id}:m${im.k}" ${imgStyle(it, 'm' + im.k)}></span>${im.caption ? `<small>${esc(im.caption)}</small>` : ''}</span>`).join('')}</div>` : ''}${lastPlan && i === it.thread.length - 1 ? `<div class="pa"><button class="btn ghost sm" type="button" data-plan-change="${it.id}">Change something</button><span class="grow"></span><button class="btn primary sm" type="button" data-plan-ok="${it.id}">Approve plan</button></div>` : ''}</div>`).join('');
   const meta = [it.priority === 'urgent' ? 'urgent' : '', it.variations > 1 ? `${it.variations} versions` : '', it.library ? `library: ${it.library === 'local' ? 'this file' : it.library}` : '',
     (it.mentions || []).length ? '@ ' + it.mentions.map(m => m.name).join(', ') : '', it.useComments ? (it.useComments === 'summarize' ? 'summarize comments' : 'apply comments') : '',
-    it.model ? (it.modelName || it.model) : '', it.skill ? 'skill: ' + it.skill : '', it.planFirst ? 'plan first' : '', it.batchMode === 'parallel' ? 'parallel' : ''].filter(Boolean).join(' · ');
+    it.model ? (it.modelName || it.model) : '', it.skill ? 'skill: ' + it.skill : '', it.planFirst ? 'plan first' : '', it.references ? `${it.references.count} Mobbin refs` : '', it.batchMode === 'parallel' ? 'parallel' : ''].filter(Boolean).join(' · ');
   const showCmp = it.status === 'done' && it.hasBefore && it.hasAfter;
   const canUndo = it.status === 'done' && it.patch && !it.reverted;
   const replyOpen = !it.reverted && (it.status === 'question' || openReplies.has(it.id) || replyDrafts[it.id]);
@@ -1258,6 +1278,7 @@ async function loadImages() {
     const kinds = [];
     if (it.nodes.length > 1 || it.nodes.some(n => n.region)) it.nodes.forEach((n, i) => { if (n.hasImage) kinds.push('t' + (i + 1)); });
     (it.attachments || []).forEach(a => { if (a.mime.startsWith('image/')) kinds.push('att' + a.n); });
+    it.thread.forEach(t => (t.images || []).forEach(im => kinds.push('m' + im.k)));
     if (it.status === 'done' && it.hasBefore && it.hasAfter) kinds.push('before', 'after');
     for (const kind of kinds) {
       const key = imgKey(it, kind);
@@ -1293,7 +1314,7 @@ function focusNote(it) {
 function redrawItem(id) { const it = items.find(i => i.id === id); const el = document.querySelector(`.item[data-id="${id}"]`); if (it && el) { el.dataset.sig = ''; renderList(); } }
 
 $('list').addEventListener('click', async e => {
-  const link = e.target.closest('a[data-href]');
+  const link = e.target.closest('a[data-href], .ref.linked');
   if (link) { e.preventDefault(); e.stopPropagation(); post({ type: 'open-url', url: link.dataset.href }); return; }
   const planOk = e.target.closest('[data-plan-ok]');
   if (planOk) { planOk.disabled = true; await sendReply(planOk.dataset.planOk, 'Plan approved. Go ahead.'); return; }

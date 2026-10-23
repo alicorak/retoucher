@@ -341,6 +341,8 @@ const server = http.createServer(async (req, res) => {
         variations: Math.max(1, Math.min(6, Number(b.variations) || 1)),
         // Figma comments: 'apply' them, or 'summarize' them into themes and a plan
         useComments: b.useComments === 'summarize' ? 'summarize' : b.useComments ? 'apply' : null,
+        // look for references before changing anything: { source: 'mobbin', count }
+        references: b.references && b.references.source === 'mobbin' ? { source: 'mobbin', count: Math.max(2, Math.min(16, Number(b.references.count) || 6)) } : null,
         // which model works on the note (a subagent), whether Claude shows a plan first, and a skill to use
         model: b.model && /^[A-Za-z0-9._:-]{1,60}$/.test(b.model) ? String(b.model) : null,
         modelName: b.model && b.modelName ? str(b.modelName, 60) : null,
@@ -362,11 +364,12 @@ const server = http.createServer(async (req, res) => {
       const item = find(parts[1]);
       const tgt = /^t(\d+)$/.exec(kind);
       const att = /^att(\d+)$/.exec(kind);
+      const msgImg = /^m(\d+)$/.exec(kind) && item && item.thread.flatMap(t => t.images || []).find(im => im.k === Number(kind.slice(1)));
       const attachment = att && item && (item.attachments || []).find(a => a.n === Number(att[1]));
-      const file = tgt && item && (item.nodes || [])[Number(tgt[1]) - 1]?.hasImage ? `${parts[1]}-t${tgt[1]}.png` : attachment ? attachment.file : kind === 'selection' ? `${parts[1]}.png` : (kind === 'before' || kind === 'after') ? `${parts[1]}-${kind}.png` : null;
+      const file = msgImg ? msgImg.file : tgt && item && (item.nodes || [])[Number(tgt[1]) - 1]?.hasImage ? `${parts[1]}-t${tgt[1]}.png` : attachment ? attachment.file : kind === 'selection' ? `${parts[1]}.png` : (kind === 'before' || kind === 'after') ? `${parts[1]}-${kind}.png` : null;
       const full = file && path.join(IMAGES, file);
       if (!full || !fs.existsSync(full)) return send(res, 404, { error: 'no image' });
-      res.writeHead(200, { 'Content-Type': attachment ? attachment.mime : 'image/png', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
+      res.writeHead(200, { 'Content-Type': attachment ? attachment.mime : msgImg ? msgImg.mime : 'image/png', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' });
       return res.end(fs.readFileSync(full));
     }
 
@@ -384,10 +387,24 @@ const server = http.createServer(async (req, res) => {
         const b = await readBody(req);
         const from = b.from === 'claude' ? 'claude' : 'user';
         if (!b.text || !String(b.text).trim()) return send(res, 400, { error: 'text required' });
+        // Claude's messages can carry pictures (references, versions), each with an optional link and caption
+        const images = [];
+        if (from === 'claude' && Array.isArray(b.images)) {
+          const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
+          for (const im of b.images.slice(0, 16)) {
+            if (!im || !EXT[im.mime] || !im.data) continue;
+            const buf = Buffer.from(String(im.data), 'base64');
+            if (!buf.length || buf.length > 8 * 1024 * 1024) continue;
+            const k = it.imgSeq = (it.imgSeq || 0) + 1;
+            const file = `${it.id}-m${k}.${EXT[im.mime]}`;
+            fs.writeFileSync(path.join(IMAGES, file), buf);
+            images.push({ k, file, mime: im.mime, link: /^https:\/\//.test(im.link || '') ? String(im.link).slice(0, 500) : null, caption: im.caption ? String(im.caption).slice(0, 120) : null });
+          }
+        }
         // Claude can rewrite its own last reply instead of adding another one
         const prev = from === 'claude' && b.replaceLast ? it.thread.findLast(t => t.from === 'claude') : null;
-        if (prev) prev.text = String(b.text).trim();
-        else it.thread.push({ from, text: String(b.text).trim(), at: now(), ...(from === 'claude' && b.kind === 'plan' ? { kind: 'plan' } : {}) });
+        if (prev) { prev.text = String(b.text).trim(); if (images.length) prev.images = images; }
+        else it.thread.push({ from, text: String(b.text).trim(), at: now(), ...(from === 'claude' && b.kind === 'plan' ? { kind: 'plan' } : {}), ...(images.length ? { images } : {}) });
         // a user message is unread until Claude answers; it re-opens a finished item, and reaches Claude mid-work too
         if (from === 'user') {
           it.unread = true;
@@ -493,6 +510,7 @@ const server = http.createServer(async (req, res) => {
         if (it.imageFile) fs.rmSync(path.join(IMAGES, it.imageFile), { force: true });
         for (const k of ['before', 'after']) fs.rmSync(path.join(IMAGES, `${it.id}-${k}.png`), { force: true });
         for (const a of it.attachments || []) fs.rmSync(path.join(IMAGES, a.file), { force: true });
+        for (const im of it.thread.flatMap(t => t.images || [])) fs.rmSync(path.join(IMAGES, im.file), { force: true });
         (it.nodes || []).forEach((n, i) => { if (n.hasImage) fs.rmSync(path.join(IMAGES, `${it.id}-t${i + 1}.png`), { force: true }); });
         save();
         return send(res, 200, { ok: true });

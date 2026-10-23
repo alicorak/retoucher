@@ -81,6 +81,18 @@ The designer reads it in a narrow panel, next to the before/after pictures. Writ
 - Use real line breaks (`$'line1\nline2'` in zsh). The panel renders paragraphs, `- ` lists, `**bold**` and links.
 - To rewrite your last reply on a note, `fa edit <id> "<reply>"`.
 
+## References from Mobbin
+
+When the note has `references` (`{ source: "mobbin", count }`), or asks for references or alternatives from Mobbin, look before you change anything:
+
+1. Step: "Looking for references on Mobbin". Look at the target's screenshot: what kind of screen it is, its platform (≤ 500 px wide: iOS, else web) and what the note wants to change.
+2. Search with the Mobbin MCP (`search_screens`; `search_flows` for flows, `search_sections` for web sections): one to three short queries that describe the look the note asks for, `platform` set, `image_format: "jpg"`, `output_destination: "design_tool"`, `output_tool: "Figma"`, and a `task_intent` from the note. If no Mobbin tools are available, say so in the reply and stop; don't scrape other sites instead.
+3. Pick `count` screens (default 6) by how they look, not by what the app does: the ones closest to the direction the note asks for, and different from each other.
+4. Put them on the canvas next to the target, never on top of anything: a SECTION named "<target name> · references", screens as rectangles at the image's aspect ratio in one or two rows, each named "Mobbin · <app name>". Fill each with `upload_assets` (`count: 1`, `nodeIds: [rect]`, one call per image, JPG) and check where each landed.
+5. If the note asks for a change ("make it like these", "try a bolder header"): duplicate the target next to the references as "<name> · v1", make the change on the copy, and leave the original alone. If it only asks for references, stop here.
+6. Patch: the section and any copy go in `remove`.
+7. Reply with the references as pictures: `fa done <id> "…" --images refs.json`, where refs.json is `[{ "path": "<the jpg Mobbin returned>", "link": "<its mobbin_url>", "caption": "<app name>" }]` (MCP: `images` on `finish_note`). The panel shows them as thumbnails that open on Mobbin. In the text, say in a line what they have in common and, if you made a copy, what you took from them.
+
 ## Text and font changes: always through the panel
 
 **Rule: never change a font family, style, size, letter spacing or line height with `use_figma`. Always use `fa text` (MCP: `edit_text_in_figma`).** Don't try `loadFontAsync` in `use_figma` first, and don't give up because a font "can't be loaded": the panel loads it.

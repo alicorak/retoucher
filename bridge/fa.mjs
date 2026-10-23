@@ -6,6 +6,7 @@
 //   fa done <id> "message"      reply and mark done
 //   fa ask <id> "question"      reply and mark as needing the user's answer
 //   fa say <id> "message"       reply without changing status
+//                               (done/ask/say/edit take --images <json-file>: [{"path","link","caption"}] shown with the message)
 //   fa edit <id> "message"      rewrite Claude's last reply on the note
 //   fa step <id> "what now"     live progress line shown under "Working" in the plugin
 //   fa plan <id> "plan"         show a plan for the designer to approve (Approve / Change), and wait
@@ -33,6 +34,15 @@ async function api(path, opts = {}) {
   return j;
 }
 
+const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+function readImages(file) {
+  if (!file) throw new Error('--images needs a JSON file: [{ "path", "link", "caption" }]');
+  return JSON.parse(fs.readFileSync(file, 'utf8')).map(im => ({
+    mime: MIME[String(im.path).split('.').pop().toLowerCase()] || 'image/png',
+    data: fs.readFileSync(im.path).toString('base64'), link: im.link, caption: im.caption,
+  }));
+}
+
 // jobs run by the Figma panel (it can load local fonts); wait for its answer
 async function runJob(id, kind, payload) {
   const job = await api(`/annotations/${id}/job`, { method: 'POST', body: { kind, payload } });
@@ -53,7 +63,8 @@ const batchLabel = it => (it.batchId ? ` [batch ${it.batchId}${it.batchMode === 
   + (it.mentions?.length ? ` [@ ${it.mentions.map(m => m.name).join(', ')}]` : '')
   + (it.library ? ` [library ${it.library}]` : '')
   + (it.useComments ? ` [comments: ${it.useComments === 'summarize' ? 'summarize' : 'apply'}]` : '')
-  + (it.model ? ` [model ${it.modelName || it.model} (id ${it.model})]` : '') + (it.planFirst ? ' [plan first]' : '') + (it.skill ? ` [skill ${it.skill}]` : '');
+  + (it.model ? ` [model ${it.modelName || it.model} (id ${it.model})]` : '') + (it.planFirst ? ' [plan first]' : '') + (it.skill ? ` [skill ${it.skill}]` : '')
+  + (it.references ? ` [references: ${it.references.count} from Mobbin]` : '');
 const nodesLabel = it => it.scope === 'file' ? `whole file "${it.fileName || '?'}"` : it.nodes.map(n => n.region ? `area ${n.w}×${n.h} in "${n.region.frameName || 'page'}"` : `${n.name} (${n.id})`).join(', ') || `whole page "${it.pageName || '?'}"`;
 
 async function main() {
@@ -97,10 +108,13 @@ async function main() {
     case 'ask':
     case 'say':
     case 'edit': {
+      // optional pictures shown with the message: --images <json-file> of [{ "path", "link"?, "caption"? }]
+      const at = rest.indexOf('--images');
+      const images = at >= 0 ? readImages(rest.splice(at, 2)[1]) : undefined;
       const text = rest.join(' ');
       if (!text) throw new Error('message required');
       const status = cmd === 'done' ? 'done' : cmd === 'ask' ? 'question' : undefined;
-      await api(`/annotations/${a}/messages`, { method: 'POST', body: { from: 'claude', text, status, replaceLast: cmd === 'edit' } });
+      await api(`/annotations/${a}/messages`, { method: 'POST', body: { from: 'claude', text, status, replaceLast: cmd === 'edit', images } });
       return console.log(`#${a} ${cmd === 'edit' ? 'reply rewritten' : status || 'replied'}`);
     }
     case 'plan': {
