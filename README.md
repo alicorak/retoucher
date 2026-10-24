@@ -1,8 +1,8 @@
-# Annotate for Claude
+# Retoucher
 
 Leave notes in Figma, your coding agent does the work. Select a layer (or mark an area like a comment), write what should change, press Send. The agent picks the note up, edits the file through the Figma MCP, shows its steps live, asks its questions and permissions in the same panel and answers there. Undo and before/after pictures included.
 
-Works with **Claude Code**, **Codex** and **Cursor**.
+Works with **Claude Code**, **Codex** and **Cursor**. Website: [retoucher.alicorak.com](https://alicorak.github.io/retoucher-site/)
 
 ```
 Figma panel  ──▶  bridge on your computer (localhost:4747)  ◀──  Claude Code / Codex / Cursor
@@ -27,35 +27,37 @@ Two parts, installed once:
 **Claude Code.** In a terminal:
 
 ```bash
-claude plugin install figma-annotate --marketplace alicorak/figma-annotate
+claude plugin install retoucher --marketplace alicorak/retoucher
 ```
 
-Or inside Claude Code: `/plugin marketplace add alicorak/figma-annotate`, then `/plugin install figma-annotate@figma-annotate`. In the Claude desktop app: **+ → Plugins** works too. It is installed for you, not for one project, so it works in whatever folder you open Claude Code in.
+Or inside Claude Code: `/plugin marketplace add alicorak/retoucher`, then `/plugin install retoucher@retoucher`. In the Claude desktop app: **+ → Plugins** works too. It is installed for you, not for one project, so it works in whatever folder you open Claude Code in.
 
 **Codex.** In a terminal:
 
 ```bash
-codex plugin marketplace add alicorak/figma-annotate
+codex plugin marketplace add alicorak/retoucher
 ```
 
-Then install **Annotate for Claude** from `/plugins` in the Codex CLI (or the Plugins tab of the desktop app) and start a new session. Codex asks you to review and trust the plugin's hooks once; they ask permission prompts in the Figma panel. The note tools come from the plugin's `figma-annotate` MCP server, so Codex's sandbox doesn't need network access.
+Then install **Retoucher** from `/plugins` in the Codex CLI (or the Plugins tab of the desktop app) and start a new session. Codex asks you to review and trust the plugin's hooks once; they ask permission prompts in the Figma panel. The note tools come from the plugin's `retoucher` MCP server, so Codex's sandbox doesn't need network access.
 
 **Cursor.** Until the plugin is in the Cursor Marketplace, install it from GitHub:
 
 ```bash
-git clone https://github.com/alicorak/figma-annotate.git ~/.figma-annotate-plugin
-mkdir -p ~/.cursor/plugins/local && ln -s ~/.figma-annotate-plugin ~/.cursor/plugins/local/figma-annotate
+git clone https://github.com/alicorak/retoucher.git ~/.retoucher-plugin
+mkdir -p ~/.cursor/plugins/local && ln -s ~/.retoucher-plugin ~/.cursor/plugins/local/retoucher
 ```
 
-Restart Cursor. The plugin adds the `figma-annotate` MCP server, the skills, and a hook that asks Figma MCP approvals in the panel while the agent works on a note. Update later with `git -C ~/.figma-annotate-plugin pull`.
+Restart Cursor. The plugin adds the `retoucher` MCP server, the skills, and a hook that asks Figma MCP approvals in the panel while the agent works on a note. Update later with `git -C ~/.retoucher-plugin pull`.
+
+**Coming from `figma-annotate` (0.7 or older)?** The plugin is now called `retoucher`. Remove the old one (`claude plugin uninstall figma-annotate`, or in Cursor delete the `~/.cursor/plugins/local/figma-annotate` link) and install it again as above. Your notes, pairing and Figma token move from `~/.figma-annotate` to `~/.retoucher` on their own.
 
 ### 2. Figma plugin
 
-Run **Annotate for Claude** from Figma's plugins (Community). The first time it connects, the panel pairs with the bridge on your computer (see *Privacy*).
+Run **Retoucher** from Figma's plugins (Community). The first time it connects, the panel pairs with the bridge on your computer (see *Privacy*).
 
 ### 3. Start watching
 
-- **Claude Code**, any folder: `/figma-annotate:watch`
+- **Claude Code**, any folder: `/retoucher:watch`
 - **Codex** or **Cursor** (Agent): ask it to "watch my Figma notes" (the `watch-figma-notes` skill)
 
 The panel's top-right tells you where things stand:
@@ -79,7 +81,7 @@ Tip: select the specific layer you mean. A selection that covers a whole row of 
 
 ## Features
 
-- **Quick action:** press ⌘/ in Figma, type "Annotate for Claude", Tab, write the note, Enter. It goes out with the current selection without opening anything else.
+- **Quick action:** press ⌘/ in Figma, type "Retoucher", Tab, write the note, Enter. It goes out with the current selection without opening anything else.
 - **Chat with every note:** write under any note at any time, also while Claude is working. Claude gets the message right away.
 - **@mentions:** type `@` in the note to pick a variable, style, component or library. Claude uses exactly those. Library components show up once they are used on the page.
 - **Design system:** *Any library* / *This file only* / a library name tells Claude what to build with. Claude builds from the file's components and variables, follows a Figma Spec if there is one, and uses hard-coded values only when nothing fits.
@@ -107,7 +109,7 @@ Reading comments goes through Figma's REST API and needs a personal access token
 
 ## How the agent handles a note
 
-The procedure is the plugin's `handle-figma-notes` skill ([skills/handle-figma-notes/SKILL.md](skills/handle-figma-notes/SKILL.md)). Claude Code uses the `fa` command, which is on its PATH while the plugin is enabled. Codex and Cursor use the same commands as tools of the `figma-annotate` MCP server (`wait_for_note`, `claim_note`, `add_step`, `finish_note`, `ask_designer`, …).
+The procedure is the plugin's `handle-figma-notes` skill ([skills/handle-figma-notes/SKILL.md](skills/handle-figma-notes/SKILL.md)). Claude Code uses the `fa` command, which is on its PATH while the plugin is enabled. Codex and Cursor use the same commands as tools of the `retoucher` MCP server (`wait_for_note`, `claim_note`, `add_step`, `finish_note`, `ask_designer`, …).
 
 | Command | What it does |
 | --- | --- |
@@ -136,14 +138,14 @@ The procedure is the plugin's `handle-figma-notes` skill ([skills/handle-figma-n
 | --- | --- |
 | Panel says "Not connected" | Open Claude Code; the plugin starts the bridge when a session starts. Check `curl localhost:4747/health` |
 | Panel says "Not paired" | Another Figma panel (another computer account or a reinstall) paired first. In Claude Code: `fa unpair`, then reopen the panel |
-| Notes stay "Waiting" | Panel says "Not watching": run `/figma-annotate:watch` |
+| Notes stay "Waiting" | Panel says "Not watching": run `/retoucher:watch` |
 | Port 4747 is used by another program | Claude Code says so at session start. Free the port |
 | Claude can't edit the file | The Figma MCP isn't connected in Claude Code, or your Figma seat has no edit access to the file |
 | Send button stays disabled | Needs a note and the file's link: paste the file URL when the panel asks (once per file) |
 
 ## Privacy
 
-Everything stays on your computer. The bridge listens on `localhost` only and keeps notes, screenshots and files in `~/.figma-annotate`, shared by every agent. The Figma plugin talks to that bridge and nothing else.
+Everything stays on your computer. The bridge listens on `localhost` only and keeps notes, screenshots and files in `~/.retoucher`, shared by every agent. The Figma plugin talks to that bridge and nothing else.
 
 Websites you visit can also reach `localhost`, so the bridge only answers a page that carries the key of the Figma panel that paired with it first. Without it, a page can't read your notes, send notes or answer permission prompts. Claude Code and its hooks run on your computer and need no key.
 

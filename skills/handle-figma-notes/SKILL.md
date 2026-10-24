@@ -1,13 +1,13 @@
 ---
 name: handle-figma-notes
-description: Handle notes sent from the "Annotate for Claude" Figma plugin (NEW #id lines from fa watch or wait_for_note). Use whenever a Figma note arrives or the user asks to work on Figma notes; covers claiming, reading targets and areas, editing through the Figma MCP, text and font changes through the panel (local fonts), undo patches, before/after snapshots, live steps, questions, plans and the reply.
+description: Handle notes sent from the "Retoucher" Figma plugin (NEW #id lines from fa watch or wait_for_note). Use whenever a Figma note arrives or the user asks to work on Figma notes; covers claiming, reading targets and areas, editing through the Figma MCP, text and font changes through the panel (local fonts), undo patches, before/after snapshots, live steps, questions, plans and the reply.
 ---
 
 # Handling Figma notes
 
-Notes from the "Annotate for Claude" Figma plugin arrive through a local bridge on this computer. There are two ways to talk to it; use whichever your agent has. They do the same things:
+Notes from the "Retoucher" Figma plugin arrive through a local bridge on this computer. There are two ways to talk to it; use whichever your agent has. They do the same things:
 
-| `fa` command (Claude Code) | MCP tool (`figma-annotate` server: Codex, Cursor, …) |
+| `fa` command (Claude Code) | MCP tool (`retoucher` server: Codex, Cursor, …) |
 | --- | --- |
 | `fa watch` (in a background monitor) | `wait_for_note` (call it again whenever it returns "nothing yet") |
 | `fa list [status]` / `fa show <id>` | `list_notes` / `show_note` |

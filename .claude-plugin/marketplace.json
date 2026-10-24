@@ -1,15 +1,15 @@
 {
-  "name": "figma-annotate",
+  "name": "retoucher",
   "owner": {
     "name": "Ali Çorak",
     "url": "https://github.com/alicorak"
   },
   "plugins": [
     {
-      "name": "figma-annotate",
+      "name": "retoucher",
       "source": "./",
       "description": "Figma notes to Claude Code: select, write, send; Claude edits the file and answers in the panel."
     }
   ],
-  "description": "Annotate for Claude: notes from a Figma panel to Claude Code."
+  "description": "Retoucher: notes from a Figma panel to Claude Code."
 }

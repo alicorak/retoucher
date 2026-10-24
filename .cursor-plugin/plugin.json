@@ -1,9 +1,9 @@
 {
-  "name": "figma-annotate",
-  "version": "0.7.0",
+  "name": "retoucher",
+  "version": "0.8.0",
   "description": "Leave notes on layers and areas in Figma; your coding agent (Claude Code, Codex, Cursor) picks them up, edits the file through the Figma MCP, shows its steps and asks for permissions in the Figma panel.",
-  "homepage": "https://github.com/alicorak/figma-annotate",
-  "repository": "https://github.com/alicorak/figma-annotate",
+  "homepage": "https://github.com/alicorak/retoucher",
+  "repository": "https://github.com/alicorak/retoucher",
   "license": "MIT",
   "keywords": [
     "figma",
@@ -18,7 +18,7 @@
   "commands": [],
   "hooks": "./cursor/hooks.json",
   "mcpServers": {
-    "figma-annotate": {
+    "retoucher": {
       "command": "node",
       "args": [
         "${CURSOR_PLUGIN_ROOT}/bridge/mcp-server.mjs"

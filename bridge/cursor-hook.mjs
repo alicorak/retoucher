@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Cursor beforeMCPExecution hook (cursor/hooks.json): while the Figma panel is open and the agent is on a note,
 // MCP tool approvals are asked in the panel (Allow once / Always allow / Decline). Otherwise it answers "ask",
-// so Cursor shows its own prompt as usual. The plugin's own figma-annotate tools only talk to the local bridge
+// so Cursor shows its own prompt as usual. The plugin's own retoucher tools only talk to the local bridge
 // and are allowed without asking. Always prints a decision: the hook is registered fail-closed.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -14,14 +14,14 @@ const decide = (permission, agent_message) => {
   process.exit(0);
 };
 // "Always allow" answers, remembered per server and tool; used only while a note is being worked on
-const ALWAYS = path.join(process.env.FA_DATA || path.join(os.homedir(), '.figma-annotate'), 'cursor-always.json');
+const ALWAYS = path.join(process.env.FA_DATA || path.join(os.homedir(), '.retoucher'), 'cursor-always.json');
 const always = () => { try { return JSON.parse(fs.readFileSync(ALWAYS, 'utf8')); } catch { return []; } };
 
 let input = {};
 try { input = JSON.parse((await readStdin()) || '{}'); } catch { decide('ask'); }
 const server = String(input.mcp_server_name || '');
 const tool = String(input.tool_name || '');
-if (/figma-annotate/.test(server)) decide('allow');
+if (/retoucher/.test(server)) decide('allow');
 
 const note = await noteInPanel();
 if (!note) decide('ask');

@@ -15,7 +15,7 @@ const PORT = Number(process.env.FA_PORT || 4747);
 const BASE = `http://localhost:${PORT}`;
 // One data folder for every agent, so notes, pairing and the Figma token are the same whichever agent starts the
 // bridge. The argument is the folder an older version used (the agent's plugin data folder): copied over once.
-const DATA = path.resolve(process.env.FA_DATA || path.join(os.homedir(), '.figma-annotate'));
+const DATA = path.resolve(process.env.FA_DATA || path.join(os.homedir(), '.retoucher'));
 const LEGACY = process.argv[2] ? path.resolve(process.argv[2]) : null;
 const VERSION = (() => {
   for (const f of ['plugin.json', path.join('.claude-plugin', 'plugin.json')]) {
@@ -23,7 +23,12 @@ const VERSION = (() => {
   }
   return 'dev';
 })();
-if (!fs.existsSync(DATA) && LEGACY && fs.existsSync(path.join(LEGACY, 'annotations.json'))) fs.cpSync(LEGACY, DATA, { recursive: true });
+// Before the rename to Retoucher (0.8.0) the shared folder was ~/.figma-annotate: it wins over a plugin data folder.
+const OLD_SHARED = path.join(os.homedir(), '.figma-annotate');
+if (!fs.existsSync(DATA)) {
+  const from = [OLD_SHARED, LEGACY].find(d => d && fs.existsSync(path.join(d, 'annotations.json')));
+  if (from) fs.cpSync(from, DATA, { recursive: true });
+}
 
 const health = async () => {
   try {
@@ -37,7 +42,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const running = await health();
 if (running?.foreign) {
-  console.log(`Annotate for Claude: port ${PORT} is used by another program, so the Figma panel can't connect. Free it or set FA_PORT.`);
+  console.log(`Retoucher: port ${PORT} is used by another program, so the Figma panel can't connect. Free it or set FA_PORT.`);
   process.exit(0);
 }
 // Several agents start this (Claude Code, Codex, Cursor), each from its own copy of the plugin, which may be
@@ -65,4 +70,4 @@ for (let i = 0; i < 30; i++) {
   await sleep(100);
   if (await health()) process.exit(0);
 }
-console.log(`Annotate for Claude: the bridge did not start; see ${path.join(DATA, 'bridge.log')}.`);
+console.log(`Retoucher: the bridge did not start; see ${path.join(DATA, 'bridge.log')}.`);

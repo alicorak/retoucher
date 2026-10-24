@@ -1,11 +1,11 @@
 {
-  "name": "figma-annotate",
+  "name": "retoucher",
   "interface": {
-    "displayName": "Annotate for Claude"
+    "displayName": "Retoucher"
   },
   "plugins": [
     {
-      "name": "figma-annotate",
+      "name": "retoucher",
       "source": {
         "source": "local",
         "path": "./"

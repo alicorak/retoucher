@@ -529,5 +529,5 @@ server.on('error', e => {
   process.exit(1);
 });
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`Annotate for Claude bridge ${VERSION} on http://localhost:${PORT}, data in ${DATA}`);
+  console.log(`Retoucher bridge ${VERSION} on http://localhost:${PORT}, data in ${DATA}`);
 });

@@ -159,8 +159,8 @@ async function handle(msg) {
   try {
     if (method === 'initialize') return send({ jsonrpc: '2.0', id: rid, result: {
       protocolVersion: params.protocolVersion || '2025-06-18', capabilities: { tools: {} },
-      serverInfo: { name: 'figma-annotate', version: VERSION },
-      instructions: 'Notes from the Annotate for Claude Figma panel. Watch with wait_for_note in a loop; handle each note with the handle-figma-notes skill.' } });
+      serverInfo: { name: 'retoucher', version: VERSION },
+      instructions: 'Notes from the Retoucher Figma panel. Watch with wait_for_note in a loop; handle each note with the handle-figma-notes skill.' } });
     if (method === 'ping') return send({ jsonrpc: '2.0', id: rid, result: {} });
     if (method === 'tools/list') return send({ jsonrpc: '2.0', id: rid, result: { tools: TOOLS.map(({ run, ...t }) => t) } });
     if (method === 'tools/call') {

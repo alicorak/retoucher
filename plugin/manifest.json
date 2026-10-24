@@ -1,5 +1,5 @@
 {
-  "name": "Annotate for Claude",
+  "name": "Retoucher",
   "id": "figma-annotate-claude-dev",
   "api": "1.0.0",
   "editorType": [
@@ -24,6 +24,6 @@
     "allowedDomains": [
       "http://localhost:4747"
     ],
-    "reasoning": "The plugin only talks to a bridge on your own computer (localhost:4747) that the Annotate for Claude plugin for Claude Code starts. Notes, screenshots and files stay on your machine; nothing is sent to any other server."
+    "reasoning": "The plugin only talks to a bridge on your own computer (localhost:4747) that the Retoucher plugin for Claude Code starts. Notes, screenshots and files stay on your machine; nothing is sent to any other server."
   }
 }

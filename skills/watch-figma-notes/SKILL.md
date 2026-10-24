@@ -1,6 +1,6 @@
 ---
 name: watch-figma-notes
-description: Start watching the Annotate for Claude Figma panel for notes and handle each one as it arrives. Use when the user says "watch Figma notes", "watch my Figma notes", "start Figma annotate" or similar.
+description: Start watching the Retoucher Figma panel for notes and handle each one as it arrives. Use when the user says "watch Figma notes", "watch my Figma notes", "start Figma annotate" or similar.
 ---
 
 # Watching for Figma notes

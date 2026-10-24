@@ -6,9 +6,9 @@ figma.clientStorage.getAsync('size').then(s => { if (s && s.w && s.h) figma.ui.r
 
 const MAX_NODES = 12;
 const MAX_TARGETS = 6; // targets that get their own screenshot
-const AREA_NAME = '✎ Annotate area (temp)';
+const AREA_NAME = '✎ Retoucher area (temp)';
 
-// ---------- quick action: Cmd+/ → "Annotate for Claude" → type the note, Enter sends it with the selection ----------
+// ---------- quick action: Cmd+/ → "Retoucher" → type the note, Enter sends it with the selection ----------
 let quickNote = null, uiReady = false;
 const IDEAS = ['Make 3 variations', 'Convert to dark mode', 'Fix spacing to the 8 pt grid', 'Use components and variables from the design system', 'Replace placeholder copy and images with realistic content', 'Apply the comments on this screen'];
 figma.parameters.on('input', ({ key, query, result }) => {
