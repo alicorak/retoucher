@@ -1,5 +1,7 @@
 # Retoucher
 
+![Retoucher: leave notes in Figma, your agent does the work](community/cover-1920x960.png)
+
 Leave notes in Figma, your coding agent does the work. Select a layer (or mark an area like a comment), write what should change, press Send. The agent picks the note up, edits the file through the Figma MCP, shows its steps live, asks its questions and permissions in the same panel and answers there. Undo and before/after pictures included.
 
 Works with **Claude Code**, **Codex** and **Cursor**. Website: [retoucher.alicorak.com](https://alicorak.github.io/retoucher-site/)
