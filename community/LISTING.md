@@ -33,4 +33,4 @@ Free and open source (MIT): https://github.com/alicorak/retoucher
 
 ## Plugin ID
 
-The Community plugin ID is `1696121338242482533` (in `plugin/manifest.json`). Community page once approved: https://www.figma.com/community/plugin/1696121338242482533
+The Community plugin ID is `1696122599848660328` (in `plugin/manifest.json`). Community page once approved: https://www.figma.com/community/plugin/1696122599848660328
