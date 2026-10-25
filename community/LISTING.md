@@ -31,6 +31,6 @@ Everything stays on your computer. The panel only talks to that local bridge (lo
 
 Free and open source (MIT): https://github.com/alicorak/retoucher
 
-## After publishing
+## Plugin ID
 
-Figma gives the published plugin a new ID. Put it in `plugin/manifest.json` (`"id"`), bump the version and release, so the panel people install from Community is the one this repo builds.
+The Community plugin ID is `1696121338242482533` (in `plugin/manifest.json`). Community page once approved: https://www.figma.com/community/plugin/1696121338242482533

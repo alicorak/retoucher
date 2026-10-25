@@ -1,6 +1,6 @@
 {
   "name": "retoucher",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Your coding agent, inside Figma. Leave notes on Figma layers; Claude Code, Codex or Cursor edits the file and answers in the panel.",
   "keywords": [
     "figma",
