@@ -14,5 +14,5 @@ Rules for changes:
 
 - The bridge stays zero-dependency Node 18+, and works on macOS, Windows and Linux.
 - Every request from a page (it has an `Origin` header) must carry the pairing key; keep new routes behind that check. Local-only routes refuse any request with an `Origin`.
-- Bump `version` in `plugin.json`, `.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json` for every release: a starting agent replaces the running bridge only with a newer version, so every copy (Claude Code, Codex, Cursor) needs the bump.
+- Bump `version` in `plugin.json`, `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json` and `npm/package.json` for every release (the npm package only prints setup steps and keeps the name; Retoucher itself is not installed from npm): a starting agent replaces the running bridge only with a newer version, so every copy (Claude Code, Codex, Cursor) needs the bump.
 - `claude plugin validate .` before a release.

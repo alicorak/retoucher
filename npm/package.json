@@ -1,0 +1,35 @@
+{
+  "name": "retoucher",
+  "version": "0.8.0",
+  "description": "Your coding agent, inside Figma. Leave notes on Figma layers; Claude Code, Codex or Cursor edits the file and answers in the panel.",
+  "keywords": [
+    "figma",
+    "figma-plugin",
+    "claude-code",
+    "codex",
+    "cursor",
+    "mcp",
+    "ai-agent"
+  ],
+  "homepage": "https://retoucher.alicorak.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alicorak/retoucher.git",
+    "directory": "npm"
+  },
+  "bugs": "https://github.com/alicorak/retoucher/issues",
+  "license": "MIT",
+  "author": "Ali Çorak",
+  "type": "module",
+  "bin": {
+    "retoucher": "bin/retoucher.mjs"
+  },
+  "files": [
+    "bin",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
