@@ -2,7 +2,7 @@
 // Claude Code PermissionRequest hook (hooks/hooks.json): asks the question in the Figma panel instead of the terminal,
 // only while the panel is open and Claude is working on a note; otherwise, or after WAIT_MS without an answer, it
 // prints nothing and Claude Code asks in the terminal as usual. The designer decides every request, except plain
-// `fa …` calls (the plugin's own CLI, which only talks to the local bridge), which are allowed without asking.
+// `retoucher …` calls (the plugin's own CLI, which only talks to the local bridge), which are allowed without asking.
 import { readStdin, noteInPanel, askPanel } from './hook-lib.mjs';
 const WAIT_MS = 110_000; // keep under the hook's timeout in hooks.json
 
@@ -36,10 +36,10 @@ function alwaysRule(tool, suggestions) {
   return { updates, label };
 }
 
-// The plugin's own `fa` command only talks to the local bridge, so a plain `fa …` call is allowed without asking.
+// The plugin's own `retoucher` command only talks to the local bridge, so a plain `retoucher …` call is allowed without asking.
 // Plain means one command: no ; & | < > or backticks, and no $( or ${ outside single quotes.
-function plainFa(cmd) {
-  if (!/^fa(\s|$)/.test(cmd)) return false;
+function plainCli(cmd) {
+  if (!/^(retoucher|fa)(\s|$)/.test(cmd)) return false; // fa: the name before 0.8.1
   let q = null; // the quote we are inside: ' " or $' (ANSI-C)
   for (let i = 0; i < cmd.length; i++) {
     const c = cmd[i], next = cmd[i + 1];
@@ -61,10 +61,10 @@ function plainFa(cmd) {
 
 const input = JSON.parse((await readStdin()) || '{}');
 const tool = input.tool_name || '';
-// Claude Code sends the command as a string; Codex may send an argv array such as ["bash", "-lc", "fa list"]
+// Claude Code sends the command as a string; Codex may send an argv array such as ["bash", "-lc", "retoucher list"]
 const cmd = input.tool_input?.command;
 const cmdText = Array.isArray(cmd) ? String(cmd.at(-1) ?? '') : String(cmd || '');
-if (tool === 'Bash' && plainFa(cmdText.trim())) out({ behavior: 'allow' });
+if (tool === 'Bash' && plainCli(cmdText.trim())) out({ behavior: 'allow' });
 // questions and plan approval go through ask-hook.mjs (PreToolUse), which can pass the answers on
 if (!tool || tool === 'AskUserQuestion' || tool === 'ExitPlanMode') passThrough();
 
@@ -75,4 +75,4 @@ const p = await askPanel({ kind: 'permission', ...describe(tool, input.tool_inpu
 if (!p) passThrough();
 if (p.decision === 'once') out({ behavior: 'allow' });
 if (p.decision === 'always') out({ behavior: 'allow', updatedPermissions: updates });
-out({ behavior: 'deny', message: 'The designer declined this in the Figma panel. Do not retry it; say in the note what you could not do, or ask with fa ask.' });
+out({ behavior: 'deny', message: 'The designer declined this in the Figma panel. Do not retry it; say in the note what you could not do, or ask with retoucher ask.' });

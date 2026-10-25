@@ -5,11 +5,11 @@ description: Start watching the Retoucher Figma panel for notes and handle each 
 
 # Watching for Figma notes
 
-1. Tell the panel which skills you have, so the designer can pick one per note: `offer_skills` (or `fa skills '<json>'`) with `{name, description}` for each skill that makes sense for design work in Figma (description under 100 characters).
-   If you can hand a task to a helper agent on another model, always also offer those models (the panel hides its Model option until you do) with their full names as your environment lists them: `offer_models` (or `fa models '<json>'`), `{id, name}` each, where `id` is what you pass when handing over. Never guess a version; skip this if you can't choose a model.
-2. Handle whatever is already waiting: `list_notes` (or `fa list`), each with the `handle-figma-notes` skill.
+1. Tell the panel which skills you have, so the designer can pick one per note: `offer_skills` (or `retoucher skills '<json>'`) with `{name, description}` for each skill that makes sense for design work in Figma (description under 100 characters).
+   If you can hand a task to a helper agent on another model, always also offer those models (the panel hides its Model option until you do) with their full names as your environment lists them: `offer_models` (or `retoucher models '<json>'`), `{id, name}` each, where `id` is what you pass when handing over. Never guess a version; skip this if you can't choose a model.
+2. Handle whatever is already waiting: `list_notes` (or `retoucher list`), each with the `handle-figma-notes` skill.
 3. Watch:
-   - **Claude Code:** start a Monitor on `fa watch` (timeout at the maximum, re-armed whenever it expires) and handle every note it reports.
+   - **Claude Code:** start a Monitor on `retoucher watch` (timeout at the maximum, re-armed whenever it expires) and handle every note it reports.
    - **Other agents (MCP):** call `wait_for_note` in a loop. It returns new notes, follow-ups and messages as they arrive, or "nothing yet" after its timeout: then call it again right away. Between calls, handle each note it returned with the `handle-figma-notes` skill, then go back to waiting. Keep going until the user tells you to stop.
 4. Tell the user in one line that you are watching.
 

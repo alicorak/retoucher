@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// MCP server (stdio) for agents other than Claude Code (Codex, Cursor, …): the same note tools as the `fa` CLI,
+// MCP server (stdio) for agents other than Claude Code (Codex, Cursor, …): the same note tools as the `retoucher` CLI,
 // plus wait_for_note (a long poll, instead of a background monitor) and ask_designer (questions shown in the
 // Figma panel). Zero dependencies: newline-delimited JSON-RPC 2.0 on stdin/stdout. Logs go to stderr only.
 import fs from 'node:fs';
@@ -30,7 +30,7 @@ const ensureBridge = () => new Promise(resolve => {
 });
 const bridgeReady = ensureBridge();
 
-// ---------- watching: one line per new note, follow-up or message, like `fa watch` ----------
+// ---------- watching: one line per new note, follow-up or message, like `retoucher watch` ----------
 const seen = new Map();
 let watchingUntil = 0;
 setInterval(() => { if (Date.now() < watchingUntil) fetch(BASE + '/presence', { method: 'POST' }).catch(() => {}); }, 4000).unref();

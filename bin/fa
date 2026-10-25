@@ -1,3 +1,3 @@
 #!/bin/sh
-# Retoucher CLI, on PATH inside Claude Code while the plugin is enabled
-exec node "$(dirname "$0")/../bridge/fa.mjs" "$@"
+# Old name of the Retoucher CLI, kept so sessions started before 0.8.1 keep working
+exec node "$(dirname "$0")/../bridge/cli.mjs" "$@"

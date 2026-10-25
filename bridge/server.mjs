@@ -1,5 +1,5 @@
 // Local bridge between the Figma plugin and Claude Code. Zero dependencies.
-// Plugin  --POST /annotations-->  bridge  <--CLI (fa.mjs)--  Claude Code
+// Plugin  --POST /annotations-->  bridge  <--CLI (cli.mjs)--  Claude Code
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -32,14 +32,14 @@ function save() {
 // Pairing: the first Figma panel that connects stores a random key here; after that, every request that comes
 // from a page (it has an Origin header, as the panel's does) must carry it. Websites open in a browser can reach
 // localhost too, and must not read notes, post notes or answer permission prompts. Local processes (Claude Code,
-// the hook, fa) send no Origin and need no key.
+// the hook, retoucher) send no Origin and need no key.
 const PAIR = path.join(DATA, 'pair.json');
 const pairKey = () => { try { return JSON.parse(fs.readFileSync(PAIR, 'utf8')).key || null; } catch { return null; } };
 const fromPage = req => req.headers.origin !== undefined;
 const keyOk = req => { const k = pairKey(); return !!k && req.headers['x-annotate-key'] === k; };
 
 const STATUSES = ['pending', 'working', 'question', 'done'];
-// `fa watch` checks in every few seconds; the panel shows "Claude ready" only while it does
+// `retoucher watch` checks in every few seconds; the panel shows "Claude ready" only while it does
 let presence = { at: 0 };
 const LISTENING_MS = 12000;
 const listening = () => Date.now() - presence.at < LISTENING_MS;
@@ -154,7 +154,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, paired, version: VERSION, count: db.items.length, comments: !!figmaToken(), claude: listening(), panel: panelOpen(), root: ROOT });
     }
 
-    // the panel offers its key once; only the first one is kept (fa unpair resets it)
+    // the panel offers its key once; only the first one is kept (retoucher unpair resets it)
     if (req.method === 'POST' && url.pathname === '/pair') {
       const b = await readBody(req);
       const key = String(b.key || '');
@@ -186,7 +186,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, comments: !!figmaToken() });
     }
 
-    // skills of the watching Claude Code session (posted by `fa skills`), offered in the panel's Options
+    // skills of the watching Claude Code session (posted by `retoucher skills`), offered in the panel's Options
     if (url.pathname === '/skills') {
       if (req.method === 'GET') return send(res, 200, db.skills || []);
       if (req.method === 'POST') {
@@ -199,7 +199,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // models the watching session can hand a note to (posted by `fa models`): [{ id, name }], shown in the panel's Options
+    // models the watching session can hand a note to (posted by `retoucher models`): [{ id, name }], shown in the panel's Options
     if (url.pathname === '/models') {
       if (req.method === 'GET') return send(res, 200, db.models || []);
       if (req.method === 'POST') {

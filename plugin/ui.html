@@ -1025,7 +1025,7 @@ async function refresh(force) {
   } catch { setOnline(false); }
 }
 
-// ---------- skills the watching Claude Code session offers (fa skills) ----------
+// ---------- skills the watching Claude Code session offers (retoucher skills) ----------
 let skillsSig = null;
 async function loadSkills() {
   const list = await (await api('/skills')).json().catch(() => []);
@@ -1038,7 +1038,7 @@ async function loadSkills() {
   $('skillRow').hidden = !list.length;
 }
 
-// ---------- models the watching session can hand a note to (fa models), with their real names ----------
+// ---------- models the watching session can hand a note to (retoucher models), with their real names ----------
 let modelsSig = null;
 async function loadModels() {
   const list = await (await api('/models')).json().catch(() => []);
@@ -1174,7 +1174,7 @@ function renderHelp() {
     off: { text: '<b>Claude Code isn’t connected.</b> Open Claude Code in any folder; it connects by itself. First time? Install the Claude Code plugin once:',
       cmd: 'claude plugin install retoucher --marketplace alicorak/retoucher', note: 'Paste it in Terminal, then open Claude Code. In the Claude app: + → Plugins works too.' },
     unpaired: { text: '<b>This panel isn’t paired.</b> Claude Code is paired with another Figma panel. To pair this one instead, ask Claude Code to “reset the Retoucher pairing”, or run:',
-      cmd: 'fa unpair', note: 'Only you can do this: the pairing keeps websites from reaching your notes.' },
+      cmd: 'retoucher unpair', note: 'Only you can do this: the pairing keeps websites from reaching your notes.' },
     idle: { text: '<b>Claude isn’t watching yet.</b> You can still send notes; they wait here. To start, type this in Claude Code:',
       cmd: '/retoucher:watch', note: '' },
     ready: { text: '<b>Claude is watching.</b> Notes are picked up as soon as you send them.', cmd: '', note: '' },

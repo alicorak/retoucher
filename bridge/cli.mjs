@@ -1,25 +1,25 @@
 #!/usr/bin/env node
 // CLI used by Claude Code to read and answer annotations from the Figma plugin.
-//   fa list [status]            open items (default: pending)
-//   fa show <id>                full detail incl. screenshot path + Figma URL
-//   fa claim <id>               mark as working (plugin shows "Claude is working")
-//   fa done <id> "message"      reply and mark done
-//   fa ask <id> "question"      reply and mark as needing the user's answer
-//   fa say <id> "message"       reply without changing status
+//   retoucher list [status]            open items (default: pending)
+//   retoucher show <id>                full detail incl. screenshot path + Figma URL
+//   retoucher claim <id>               mark as working (plugin shows "Claude is working")
+//   retoucher done <id> "message"      reply and mark done
+//   retoucher ask <id> "question"      reply and mark as needing the user's answer
+//   retoucher say <id> "message"       reply without changing status
 //                               (done/ask/say/edit take --images <json-file>: [{"path","link","caption"}] shown with the message)
-//   fa edit <id> "message"      rewrite Claude's last reply on the note
-//   fa step <id> "what now"     live progress line shown under "Working" in the plugin
-//   fa plan <id> "plan"         show a plan for the designer to approve (Approve / Change), and wait
-//   fa fonts <id> [query]       fonts installed on the designer's computer, as Figma sees them (run by the panel)
-//   fa text <id> <json-file>    change text in Figma through the panel, local fonts included; Undo is recorded
-//   fa models '<json>'          tell the panel which models this session can hand a note to: [{"id","name"}]
-//   fa skills '<json>'          tell the panel which skills this session has: [{"name","description"}]
-//   fa snapshot <id> before|after <png>   store a before/after screenshot (shown in the plugin)
-//   fa patch <id> <json-file>   store the revert patch so the plugin can Undo (see CLAUDE.md)
-//   fa focus <id> <json-file>   layers to select in Figma (JSON array of node ids); the plugin shows a Select button
-//   fa comments <fileKey|id> [--all]   Figma comment threads of the file (open ones unless --all); needs a token
-//   fa unpair                   forget the paired Figma panel, so another one can pair
-//   fa watch                    print one line per new note, follow-up or message while working (for Monitor)
+//   retoucher edit <id> "message"      rewrite Claude's last reply on the note
+//   retoucher step <id> "what now"     live progress line shown under "Working" in the plugin
+//   retoucher plan <id> "plan"         show a plan for the designer to approve (Approve / Change), and wait
+//   retoucher fonts <id> [query]       fonts installed on the designer's computer, as Figma sees them (run by the panel)
+//   retoucher text <id> <json-file>    change text in Figma through the panel, local fonts included; Undo is recorded
+//   retoucher models '<json>'          tell the panel which models this session can hand a note to: [{"id","name"}]
+//   retoucher skills '<json>'          tell the panel which skills this session has: [{"name","description"}]
+//   retoucher snapshot <id> before|after <png>   store a before/after screenshot (shown in the plugin)
+//   retoucher patch <id> <json-file>   store the revert patch so the plugin can Undo (see CLAUDE.md)
+//   retoucher focus <id> <json-file>   layers to select in Figma (JSON array of node ids); the plugin shows a Select button
+//   retoucher comments <fileKey|id> [--all]   Figma comment threads of the file (open ones unless --all); needs a token
+//   retoucher unpair                   forget the paired Figma panel, so another one can pair
+//   retoucher watch                    print one line per new note, follow-up or message while working (for Monitor)
 import fs from 'node:fs';
 const BASE = `http://localhost:${process.env.FA_PORT || 4747}`;
 
@@ -83,19 +83,19 @@ async function main() {
     }
     case 'snapshot': {
       const [kind, file] = rest.length ? [rest[0], rest[1]] : [];
-      if (!['before', 'after'].includes(kind) || !file) throw new Error('usage: fa snapshot <id> before|after <png>');
+      if (!['before', 'after'].includes(kind) || !file) throw new Error('usage: retoucher snapshot <id> before|after <png>');
       await api(`/annotations/${a}/snapshot`, { method: 'POST', body: { kind, image: fs.readFileSync(file).toString('base64') } });
       return console.log(`#${a} ${kind} snapshot saved`);
     }
     case 'patch': {
       const file = rest[0];
-      if (!file) throw new Error('usage: fa patch <id> <json-file>');
+      if (!file) throw new Error('usage: retoucher patch <id> <json-file>');
       await api(`/annotations/${a}/patch`, { method: 'POST', body: { patch: JSON.parse(fs.readFileSync(file, 'utf8')) } });
       return console.log(`#${a} revert patch saved`);
     }
     case 'focus': {
       const file = rest[0];
-      if (!file) throw new Error('usage: fa focus <id> <json-file>');
+      if (!file) throw new Error('usage: retoucher focus <id> <json-file>');
       const j = JSON.parse(fs.readFileSync(file, 'utf8'));
       const ids = Array.isArray(j) ? j : j.ids;
       await api(`/annotations/${a}`, { method: 'PATCH', body: { focus: ids } });
@@ -119,7 +119,7 @@ async function main() {
     }
     case 'plan': {
       const text = rest.join(' ');
-      if (!text) throw new Error('usage: fa plan <id> "the plan, in markdown"');
+      if (!text) throw new Error('usage: retoucher plan <id> "the plan, in markdown"');
       await api(`/annotations/${a}/messages`, { method: 'POST', body: { from: 'claude', text, status: 'question', kind: 'plan' } });
       return console.log(`#${a} plan shown, waiting for approval`);
     }
@@ -132,7 +132,7 @@ async function main() {
     }
     case 'text': {
       const src = rest.join(' ');
-      if (!src) throw new Error('usage: fa text <id> <json-file>  (an array of ops, see the skill)');
+      if (!src) throw new Error('usage: retoucher text <id> <json-file>  (an array of ops, see the skill)');
       const json = JSON.parse(fs.existsSync(src) ? fs.readFileSync(src, 'utf8') : src);
       const r = await runJob(a, 'text', { ops: Array.isArray(json) ? json : json.ops });
       if (r.error) throw new Error(r.error);
@@ -141,19 +141,19 @@ async function main() {
       return;
     }
     case 'models': {
-      if (!a) throw new Error(`usage: fa models '[{"id":"opus","name":"Claude Opus 5.5"}]'`);
+      if (!a) throw new Error(`usage: retoucher models '[{"id":"opus","name":"Claude Opus 5.5"}]'`);
       const r = await api('/models', { method: 'POST', body: { models: JSON.parse([a, ...rest].join(' ')) } });
       return console.log(`${r.count} models offered in the panel`);
     }
     case 'skills': {
-      if (!a) throw new Error(`usage: fa skills '[{"name":"…","description":"…"}]'`);
+      if (!a) throw new Error(`usage: retoucher skills '[{"name":"…","description":"…"}]'`);
       const skills = JSON.parse([a, ...rest].join(' '));
       const r = await api('/skills', { method: 'POST', body: { skills } });
       return console.log(`${r.count} skills offered in the panel`);
     }
     case 'step': {
       const text = rest.join(' ');
-      if (!text) throw new Error('usage: fa step <id> "what you are doing"');
+      if (!text) throw new Error('usage: retoucher step <id> "what you are doing"');
       await api(`/annotations/${a}/progress`, { method: 'POST', body: { text } });
       return console.log(`#${a} step: ${oneLine(text)}`);
     }
@@ -161,7 +161,7 @@ async function main() {
       await api('/unpair', { method: 'POST' });
       return console.log('Pairing reset. The next Figma panel that opens pairs with this bridge.');
     case 'comments': {
-      if (!a) throw new Error('usage: fa comments <fileKey|note id> [--all]');
+      if (!a) throw new Error('usage: retoucher comments <fileKey|note id> [--all]');
       const key = /^\d+$/.test(a) ? (await api(`/annotations/${a}`)).fileKey : a;
       const threads = await api(`/comments/${key}${rest.includes('--all') ? '' : '?open=1'}`);
       if (!threads.length) return console.log('(no comments)');
@@ -196,7 +196,7 @@ async function main() {
       }
     }
     default:
-      console.log('usage: fa list|show|claim|snapshot|patch|focus|done|ask|say|edit|step|plan|fonts|text|models|skills|comments|unpair|watch');
+      console.log('usage: retoucher list|show|claim|snapshot|patch|focus|done|ask|say|edit|step|plan|fonts|text|models|skills|comments|unpair|watch');
   }
 }
 
