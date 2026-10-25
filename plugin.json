@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "retoucher",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Leave notes on layers and areas in Figma; your coding agent (Claude Code, Codex, Cursor) picks them up, edits the file through the Figma MCP, shows its steps and asks for permissions in the Figma panel.",
   "author": {
     "name": "Ali Çorak",
