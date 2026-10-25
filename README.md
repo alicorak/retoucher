@@ -55,7 +55,7 @@ Restart Cursor. The plugin adds the `retoucher` MCP server, the skills, and a ho
 
 ### 2. Figma plugin
 
-Run **Retoucher** from Figma's plugins (Community). The first time it connects, the panel pairs with the bridge on your computer (see *Privacy*).
+Install [Retoucher from Figma Community](https://www.figma.com/community/plugin/1696122599848660328/retoucher) and run it from Figma's plugins. The first time it connects, the panel pairs with the bridge on your computer (see *Privacy*).
 
 ### 3. Start watching
 
