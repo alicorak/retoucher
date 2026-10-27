@@ -26,6 +26,7 @@ Select a layer, mark an area or drop a pin, and write what should change, like a
 - Live steps, questions, plans and permission prompts in the panel
 - Before and after pictures, and Undo
 - Versions side by side, references, Figma comments, batches, whole-file notes
+- Small mode: shrink the panel to a bar that shows when a note needs you
 
 How to try it:
 1. Open https://retoucher.alicorak.com and copy the setup prompt.
@@ -45,6 +46,13 @@ Free and open source (MIT): https://github.com/alicorak/retoucher
 | Does it store data? | Notes and settings stay on the user's computer (~/.retoucher) and in Figma client storage. |
 | Does it use AI? | The user's own coding agent, running on their own computer and account, does the edits. The plugin itself calls no AI service. |
 | Third parties? | None. |
+
+## Release notes
+
+Paste the newest one into *Final details* when publishing a new version.
+
+- **0.8.4:** Small mode. The button next to the status shrinks the panel to a small bar that shows when a note needs your answer or is in progress; click it to open the panel again. Retoucher opens the way you left it.
+- **0.8.3:** Setup steps in the panel when no coding agent is connected yet, clearer listing.
 
 ## Plugin ID
 

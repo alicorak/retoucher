@@ -9,4 +9,6 @@ npx retoucher          # how to set it up
 npx retoucher prompt   # the setup prompt to paste into your agent
 ```
 
+Figma plugin: https://www.figma.com/community/plugin/1696122599848660328/retoucher
+
 Website: https://retoucher.alicorak.com · Source and docs: https://github.com/alicorak/retoucher
