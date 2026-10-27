@@ -58,6 +58,17 @@
   .dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--bad); }
   .dot.on { background: var(--ok); }
   .dot.wait { background: var(--warn); }
+  .bar .right { display: flex; align-items: center; gap: 2px; }
+  .icon-btn { width: 24px; height: 24px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: none; color: var(--text2); cursor: pointer; }
+  .icon-btn:hover { background: var(--hover); color: var(--text); }
+  /* minimised: only a small bar; Figma's own window title moves it */
+  #mini { display: none; }
+  body.mini > *:not(#mini) { display: none !important; }
+  body.mini #mini { height: 100vh; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; border: 0; background: none; color: var(--text); font: inherit; width: 100%; cursor: pointer; text-align: left; }
+  body.mini #mini:hover { background: var(--hover); }
+  #mini .txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text2); }
+  #mini .txt b { color: var(--text); font-weight: 600; }
+  #mini .txt .ask { color: var(--warn); }
 
   /* banners: connection help, missing file key */
   .banner { flex: none; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--bg2); display: flex; flex-direction: column; gap: 6px; }
@@ -77,6 +88,10 @@
   .empty { padding: 32px 20px; color: var(--text2); }
   .empty b { display: block; color: var(--text); font-weight: 600; margin-bottom: 8px; }
   .empty ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+  .welcome { display: flex; flex-direction: column; gap: 12px; }
+  .welcome b { margin: 0; }
+  .welcome p { margin: 0; }
+  .welcome .btn { align-self: flex-start; }
   .item { padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .item:hover { background: var(--hover); }
   .item.hit { box-shadow: inset 2px 0 0 var(--brand); background: var(--brand-soft); }
@@ -260,8 +275,12 @@
 
 <header class="bar">
   <b>Retoucher</b>
-  <button class="status" id="conn" type="button" title="Connection"><span class="dot" id="dot"></span><span id="connText">Connecting…</span></button>
+  <div class="right">
+    <button class="status" id="conn" type="button" title="Connection"><span class="dot" id="dot"></span><span id="connText">Connecting…</span></button>
+    <button class="icon-btn" id="miniBtn" type="button" title="Make small"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 10 7-7"/><path d="M20 10h-6V4"/><path d="m3 21 7-7"/><path d="M4 14h6v6"/></svg></button>
+  </div>
 </header>
+<button id="mini" type="button" title="Open Retoucher"><span class="dot" id="miniDot"></span><span class="txt" id="miniText"><b>Retoucher</b></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></button>
 
 <!-- what is missing and how to fix it, shown until Claude is ready -->
 <div class="banner" id="help" hidden>
@@ -311,7 +330,7 @@
       <button class="btn ghost sm" id="tokenSave" type="button">Save</button>
     </div>
     <div class="orow">
-      <span class="lbl" title="Claude first looks for this many matching screens on Mobbin, puts them next to your selection and shows them here, then makes the change on a copy">Mobbin refs</span>
+      <span class="lbl" title="Claude first looks for this many matching screens through a references MCP you have connected (Mobbin, for example), puts them next to your selection and shows them here, then makes the change on a copy">References</span>
       <div class="seg" id="refs"><button data-v="" class="on" type="button">Off</button><button data-v="4" type="button">4</button><button data-v="8" type="button">8</button><button data-v="12" type="button">12</button></div>
     </div>
     <div class="orow" id="modelRow" hidden>
@@ -451,7 +470,7 @@ function fileKeyFromUrl(u) {
   return m ? m[1] : null;
 }
 function effectiveKey() { return ctx.fileKey || fileKeyFromUrl($('fileUrl').value); }
-function showSetup() { $('setup').hidden = !!effectiveKey(); }
+function showSetup() { $('setup').hidden = !!effectiveKey() || connState === 'off'; } // off: the welcome screen comes first
 
 window.onmessage = e => {
   const m = e.data && e.data.pluginMessage;
@@ -463,6 +482,7 @@ window.onmessage = e => {
   if (m.type === 'prefs') {
     setPairKey(m.pairKey);
     if (m.size && m.size.w && m.size.h) normalSize = { w: m.size.w, h: m.size.h };
+    if (m.mini) setMini(true, false);
   }
   if (m.type === 'mention-results') showMentions(m.q, m.results || []);
   if (m.type === 'markers-pref') { markersOn = m.value; $('markers').checked = m.value; syncMarkers(); }
@@ -836,7 +856,7 @@ function optionsSummary() {
   const on = [wholeFile() ? 'whole file' : '', v !== '1' ? v + ' versions' : '', $('library').value ? ($('library').value === 'local' ? 'this file only' : $('library').value) : '',
     getComments() ? (getComments() === 'summarize' ? 'summarize comments' : 'apply comments') : '',
     $('model').value ? $('model').selectedOptions[0].textContent : '', $('skill').value ? 'skill: ' + $('skill').value : '',
-    $('planFirst').checked ? 'plan first' : '', getRefs() ? getRefs() + ' Mobbin refs' : '', $('urgent').checked ? 'urgent' : ''].filter(Boolean);
+    $('planFirst').checked ? 'plan first' : '', getRefs() ? getRefs() + ' refs' : '', $('urgent').checked ? 'urgent' : ''].filter(Boolean);
   $('optsBadge').hidden = !on.length;
   $('optLine').hidden = !on.length;
   $('optLine').textContent = on.join(' · ');
@@ -1163,16 +1183,20 @@ function setOnline(v, claude, unpaired) {
     connState = state;
     $('dot').className = 'dot' + (state === 'ready' ? ' on' : state === 'idle' ? ' wait' : '');
     $('connText').textContent = { off: 'Not connected', unpaired: 'Not paired', idle: 'Not watching', ready: 'Claude ready' }[state];
-    helpOpen = state !== 'ready';
+    $('miniDot').className = $('dot').className;
+    renderMini();
+    helpOpen = state !== 'ready' && state !== 'off'; // off: the welcome screen explains it
     renderHelp();
+    showSetup();
+    if (state === 'off') renderWelcome(); else if (!items.length) renderList();
   }
   updateSend();
   if (v && quickPending) sendQuick();
 }
 function renderHelp() {
   const h = {
-    off: { text: '<b>Claude Code isn’t connected.</b> Open Claude Code in any folder; it connects by itself. First time? Install the Claude Code plugin once:',
-      cmd: 'claude plugin install retoucher --marketplace alicorak/retoucher', note: 'Paste it in Terminal, then open Claude Code. In the Claude app: + → Plugins works too.' },
+    off: { text: '<b>No agent is connected.</b> Open Claude Code, Codex or Cursor in any folder; it connects by itself. First time with Claude Code? Install the plugin once:',
+      cmd: 'claude plugin install retoucher --marketplace alicorak/retoucher', note: 'Codex and Cursor: see retoucher.alicorak.com.' },
     unpaired: { text: '<b>This panel isn’t paired.</b> Claude Code is paired with another Figma panel. To pair this one instead, ask Claude Code to “reset the Retoucher pairing”, or run:',
       cmd: 'retoucher unpair', note: 'Only you can do this: the pairing keeps websites from reaching your notes.' },
     idle: { text: '<b>Claude isn’t watching yet.</b> You can still send notes; they wait here. To start, type this in Claude Code:',
@@ -1215,7 +1239,7 @@ function itemHtml(it) {
   const thread = it.thread.map((t, i) => `<div class="msg ${t.from}${t.kind === 'plan' ? ' plan' : ''}">${t.from === 'system' ? '' : `<small>${t.from === 'claude' ? (t.kind === 'plan' ? 'Claude · Plan' : 'Claude') : 'You'}</small>`}${t.from === 'claude' ? richText(t.text) : esc(t.text)}${(t.images || []).length ? `<div class="refs">${t.images.map(im => `<span class="ref${im.link ? ' linked' : ''}" ${im.link ? `data-href="${esc(im.link)}"` : ''} title="${esc(im.caption || im.link || '')}"><span class="ph" data-img="${it.id}:m${im.k}" ${imgStyle(it, 'm' + im.k)}></span>${im.caption ? `<small>${esc(im.caption)}</small>` : ''}</span>`).join('')}</div>` : ''}${lastPlan && i === it.thread.length - 1 ? `<div class="pa"><button class="btn ghost sm" type="button" data-plan-change="${it.id}">Change something</button><span class="grow"></span><button class="btn primary sm" type="button" data-plan-ok="${it.id}">Approve plan</button></div>` : ''}</div>`).join('');
   const meta = [it.priority === 'urgent' ? 'urgent' : '', it.variations > 1 ? `${it.variations} versions` : '', it.library ? `library: ${it.library === 'local' ? 'this file' : it.library}` : '',
     (it.mentions || []).length ? '@ ' + it.mentions.map(m => m.name).join(', ') : '', it.useComments ? (it.useComments === 'summarize' ? 'summarize comments' : 'apply comments') : '',
-    it.model ? (it.modelName || it.model) : '', it.skill ? 'skill: ' + it.skill : '', it.planFirst ? 'plan first' : '', it.references ? `${it.references.count} Mobbin refs` : '', it.batchMode === 'parallel' ? 'parallel' : ''].filter(Boolean).join(' · ');
+    it.model ? (it.modelName || it.model) : '', it.skill ? 'skill: ' + it.skill : '', it.planFirst ? 'plan first' : '', it.references ? `${it.references.count} refs` : '', it.batchMode === 'parallel' ? 'parallel' : ''].filter(Boolean).join(' · ');
   const showCmp = it.status === 'done' && it.hasBefore && it.hasAfter;
   const canUndo = it.status === 'done' && it.patch && !it.reverted;
   const replyOpen = !it.reverted && (it.status === 'question' || openReplies.has(it.id) || replyDrafts[it.id]);
@@ -1243,8 +1267,18 @@ function itemHtml(it) {
 
 // only the notes that changed are redrawn, so scrolling, typing and pictures stay put
 const itemSig = it => JSON.stringify([it.updatedAt, it.status, it.thread.length, (it.progress || []).length, it.reverted, (it.focus || []).length, !!it.patch, it.hasBefore, it.hasAfter, openReplies.has(it.id), !!replyDrafts[it.id]]);
+// first run, or no agent running: what Retoucher needs, so the panel explains itself
+const WELCOME = `<div class="empty welcome"><b>Retoucher works with a coding agent on your computer</b>
+  <p>Claude Code, Codex or Cursor reads the notes you write here, edits this file through the Figma MCP and answers in this panel.</p>
+  <ol><li>Install the Retoucher agent plugin once. The setup guide has a prompt you paste into your agent.</li><li>Open your agent in any folder. This panel connects by itself.</li><li>Select a layer, write what should change and send.</li></ol>
+  <button class="btn primary sm" type="button" data-open="https://retoucher.alicorak.com/#start">Open the setup guide</button>
+  <p class="muted">Nothing leaves your computer: the panel only talks to the agent's bridge on localhost:4747.</p></div>`;
+function renderWelcome() { if (!items.length) { $('list').innerHTML = WELCOME; shownCount = 0; } }
+
 function renderList() {
+  renderMini();
   const list = $('list');
+  if (!items.length && connState === 'off') { renderWelcome(); return; }
   if (!items.length) {
     list.innerHTML = `<div class="empty"><b>No notes yet</b><ol><li>Select layers or a frame on the canvas, or nothing for the whole page.</li><li>Write what should change below.</li><li>Send. Claude edits the file and answers here.</li></ol></div>`;
     shownCount = 0; return;
@@ -1314,6 +1348,8 @@ function focusNote(it) {
 function redrawItem(id) { const it = items.find(i => i.id === id); const el = document.querySelector(`.item[data-id="${id}"]`); if (it && el) { el.dataset.sig = ''; renderList(); } }
 
 $('list').addEventListener('click', async e => {
+  const open = e.target.closest('[data-open]');
+  if (open) { post({ type: 'open-url', url: open.dataset.open }); return; }
   const link = e.target.closest('a[data-href], .ref.linked');
   if (link) { e.preventDefault(); e.stopPropagation(); post({ type: 'open-url', url: link.dataset.href }); return; }
   const planOk = e.target.closest('[data-plan-ok]');
@@ -1380,6 +1416,23 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape' && !$('opts').hidden) setOpts(false);
 });
+
+// ---------- small mode: a bar that shows what is going on; click it to open the panel again ----------
+const MINI = { w: 240, h: 44 };
+function setMini(on, save = true) {
+  document.body.classList.toggle('mini', on);
+  post({ type: 'resize', ...(on ? MINI : normalSize) });
+  if (save) post({ type: 'set-pref', key: 'mini', value: on });
+  if (!on) renderList();
+}
+function renderMini() {
+  const ask = items.filter(i => i.status === 'question' && !i.reverted).length;
+  const busy = items.filter(i => (i.status === 'working' || i.status === 'pending') && !i.reverted).length;
+  const what = ask ? `<span class="ask">${ask} need${ask > 1 ? '' : 's'} an answer</span>` : busy ? `${busy} in progress` : $('connText').textContent;
+  $('miniText').innerHTML = `<b>Retoucher</b> · ${what}`;
+}
+$('miniBtn').onclick = () => setMini(true);
+$('mini').onclick = () => setMini(false);
 
 // ---------- resizing the panel from its corner ----------
 (() => {
