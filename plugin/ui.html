@@ -58,6 +58,17 @@
   .dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--bad); }
   .dot.on { background: var(--ok); }
   .dot.wait { background: var(--warn); }
+  .bar .right { display: flex; align-items: center; gap: 2px; }
+  .icon-btn { width: 24px; height: 24px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: none; color: var(--text2); cursor: pointer; }
+  .icon-btn:hover { background: var(--hover); color: var(--text); }
+  /* minimised: only a small bar; Figma's own window title moves it */
+  #mini { display: none; }
+  body.mini > *:not(#mini) { display: none !important; }
+  body.mini #mini { height: 100vh; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; border: 0; background: none; color: var(--text); font: inherit; width: 100%; cursor: pointer; text-align: left; }
+  body.mini #mini:hover { background: var(--hover); }
+  #mini .txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text2); }
+  #mini .txt b { color: var(--text); font-weight: 600; }
+  #mini .txt .ask { color: var(--warn); }
 
   /* banners: connection help, missing file key */
   .banner { flex: none; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--bg2); display: flex; flex-direction: column; gap: 6px; }
@@ -264,8 +275,12 @@
 
 <header class="bar">
   <b>Retoucher</b>
-  <button class="status" id="conn" type="button" title="Connection"><span class="dot" id="dot"></span><span id="connText">Connecting…</span></button>
+  <div class="right">
+    <button class="status" id="conn" type="button" title="Connection"><span class="dot" id="dot"></span><span id="connText">Connecting…</span></button>
+    <button class="icon-btn" id="miniBtn" type="button" title="Make small"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 10 7-7"/><path d="M20 10h-6V4"/><path d="m3 21 7-7"/><path d="M4 14h6v6"/></svg></button>
+  </div>
 </header>
+<button id="mini" type="button" title="Open Retoucher"><span class="dot" id="miniDot"></span><span class="txt" id="miniText"><b>Retoucher</b></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></button>
 
 <!-- what is missing and how to fix it, shown until Claude is ready -->
 <div class="banner" id="help" hidden>
@@ -467,6 +482,7 @@ window.onmessage = e => {
   if (m.type === 'prefs') {
     setPairKey(m.pairKey);
     if (m.size && m.size.w && m.size.h) normalSize = { w: m.size.w, h: m.size.h };
+    if (m.mini) setMini(true, false);
   }
   if (m.type === 'mention-results') showMentions(m.q, m.results || []);
   if (m.type === 'markers-pref') { markersOn = m.value; $('markers').checked = m.value; syncMarkers(); }
@@ -1167,6 +1183,8 @@ function setOnline(v, claude, unpaired) {
     connState = state;
     $('dot').className = 'dot' + (state === 'ready' ? ' on' : state === 'idle' ? ' wait' : '');
     $('connText').textContent = { off: 'Not connected', unpaired: 'Not paired', idle: 'Not watching', ready: 'Claude ready' }[state];
+    $('miniDot').className = $('dot').className;
+    renderMini();
     helpOpen = state !== 'ready' && state !== 'off'; // off: the welcome screen explains it
     renderHelp();
     showSetup();
@@ -1258,6 +1276,7 @@ const WELCOME = `<div class="empty welcome"><b>Retoucher works with a coding age
 function renderWelcome() { if (!items.length) { $('list').innerHTML = WELCOME; shownCount = 0; } }
 
 function renderList() {
+  renderMini();
   const list = $('list');
   if (!items.length && connState === 'off') { renderWelcome(); return; }
   if (!items.length) {
@@ -1397,6 +1416,23 @@ document.addEventListener('keydown', e => {
   }
   if (e.key === 'Escape' && !$('opts').hidden) setOpts(false);
 });
+
+// ---------- small mode: a bar that shows what is going on; click it to open the panel again ----------
+const MINI = { w: 240, h: 44 };
+function setMini(on, save = true) {
+  document.body.classList.toggle('mini', on);
+  post({ type: 'resize', ...(on ? MINI : normalSize) });
+  if (save) post({ type: 'set-pref', key: 'mini', value: on });
+  if (!on) renderList();
+}
+function renderMini() {
+  const ask = items.filter(i => i.status === 'question' && !i.reverted).length;
+  const busy = items.filter(i => (i.status === 'working' || i.status === 'pending') && !i.reverted).length;
+  const what = ask ? `<span class="ask">${ask} need${ask > 1 ? '' : 's'} an answer</span>` : busy ? `${busy} in progress` : $('connText').textContent;
+  $('miniText').innerHTML = `<b>Retoucher</b> · ${what}`;
+}
+$('miniBtn').onclick = () => setMini(true);
+$('mini').onclick = () => setMini(false);
 
 // ---------- resizing the panel from its corner ----------
 (() => {

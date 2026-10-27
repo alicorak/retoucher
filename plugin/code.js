@@ -2,7 +2,11 @@
 // The UI iframe talks to the bridge.
 figma.showUI(__html__, { width: 360, height: 720, themeColors: true });
 // the panel opens at the size the designer last dragged it to
-figma.clientStorage.getAsync('size').then(s => { if (s && s.w && s.h) figma.ui.resize(Math.round(s.w), Math.round(s.h)); }).catch(() => {});
+// (or as the small bar, if it was left small)
+Promise.all([figma.clientStorage.getAsync('size'), figma.clientStorage.getAsync('mini')]).then(([s, mini]) => {
+  if (mini) figma.ui.resize(240, 44);
+  else if (s && s.w && s.h) figma.ui.resize(Math.round(s.w), Math.round(s.h));
+}).catch(() => {});
 
 const MAX_NODES = 12;
 const MAX_TARGETS = 6; // targets that get their own screenshot
@@ -546,7 +550,7 @@ figma.ui.onmessage = async msg => {
     libraryNames().then(names => figma.ui.postMessage({ type: 'libraries', names }));
     const markers = await figma.clientStorage.getAsync('markers');
     figma.ui.postMessage({ type: 'markers-pref', value: markers !== false });
-    figma.ui.postMessage({ type: 'prefs', pairKey: await figma.clientStorage.getAsync('pairKey'), optionsOpen: await figma.clientStorage.getAsync('optionsOpen'), size: await figma.clientStorage.getAsync('size') });
+    figma.ui.postMessage({ type: 'prefs', pairKey: await figma.clientStorage.getAsync('pairKey'), optionsOpen: await figma.clientStorage.getAsync('optionsOpen'), size: await figma.clientStorage.getAsync('size'), mini: await figma.clientStorage.getAsync('mini') });
   }
   if (msg.type === 'run-job') {
     let result;
@@ -557,7 +561,7 @@ figma.ui.onmessage = async msg => {
     figma.ui.postMessage({ type: 'job-result', id: msg.id, jobId: msg.jobId, result });
   }
   if (msg.type === 'save-file-key') { await saveKey(msg.key); pushContext(); }
-  if (msg.type === 'set-pref' && ['pairKey', 'optionsOpen', 'size'].includes(msg.key)) await figma.clientStorage.setAsync(msg.key, msg.value);
+  if (msg.type === 'set-pref' && ['pairKey', 'optionsOpen', 'size', 'mini'].includes(msg.key)) await figma.clientStorage.setAsync(msg.key, msg.value);
   if (msg.type === 'set-markers') await figma.clientStorage.setAsync('markers', !!msg.value);
   if (msg.type === 'sync-markers') await syncMarkers(msg.items, msg.enabled);
   if (msg.type === 'clear-markers') {
