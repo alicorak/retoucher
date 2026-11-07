@@ -127,6 +127,8 @@ const TOOLS = [
     run: async a => { const r = await api('/models', { method: 'POST', body: { models: a.models } }); return `${r.count} models offered`; } },
   { name: 'offer_skills', description: 'Tell the panel which skills you have, so the designer can pick one per note.', inputSchema: S({ skills: { type: 'array', items: S({ name: { type: 'string' }, description: { type: 'string' } }, ['name']) } }, ['skills']),
     run: async a => { const r = await api('/skills', { method: 'POST', body: { skills: a.skills } }); return `${r.count} skills offered`; } },
+  { name: 'figma_plugin_path', description: 'Path of the Retoucher Figma plugin\'s manifest.json. The designer imports it in the Figma desktop app: Plugins → Development → Import plugin from manifest…', inputSchema: S({}),
+    run: async () => path.join(ROOT, 'plugin', 'manifest.json') },
 ];
 
 async function runJob(noteId, kind, payload) {

@@ -20,7 +20,9 @@
 //   retoucher comments <fileKey|id> [--all]   Figma comment threads of the file (open ones unless --all); needs a token
 //   retoucher unpair                   forget the paired Figma panel, so another one can pair
 //   retoucher watch                    print one line per new note, follow-up or message while working (for Monitor)
+//   retoucher figma-plugin             path of the Figma plugin's manifest.json, to import it in Figma desktop
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 const BASE = `http://localhost:${process.env.FA_PORT || 4747}`;
 
 async function api(path, opts = {}) {
@@ -157,6 +159,9 @@ async function main() {
       await api(`/annotations/${a}/progress`, { method: 'POST', body: { text } });
       return console.log(`#${a} step: ${oneLine(text)}`);
     }
+    case 'figma-plugin':
+      // the Figma plugin ships inside this agent plugin; Figma desktop imports it from this file
+      return console.log(fileURLToPath(new URL('../plugin/manifest.json', import.meta.url)));
     case 'unpair':
       await api('/unpair', { method: 'POST' });
       return console.log('Pairing reset. The next Figma panel that opens pairs with this bridge.');
@@ -196,7 +201,7 @@ async function main() {
       }
     }
     default:
-      console.log('usage: retoucher list|show|claim|snapshot|patch|focus|done|ask|say|edit|step|plan|fonts|text|models|skills|comments|unpair|watch');
+      console.log('usage: retoucher list|show|claim|snapshot|patch|focus|done|ask|say|edit|step|plan|fonts|text|models|skills|comments|unpair|watch|figma-plugin');
   }
 }
 
