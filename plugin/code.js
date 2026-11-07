@@ -424,7 +424,8 @@ async function runTextOps(ops) {
           result.changedRanges++;
         }
       } catch (e) { result.skipped.push({ id: node.id, name: node.name, reason: e.message }); }
-      if (touched) { result.changedLayers++; result.revert.text.push({ id: node.id, segments: before }); }
+      // newest first, like the bridge's Undo patch: a layer touched by several ops ends on its earliest snapshot
+      if (touched) { result.changedLayers++; result.revert.text.unshift({ id: node.id, segments: before }); }
     }
   }
   figma.commitUndo();
