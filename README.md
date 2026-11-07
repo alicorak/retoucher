@@ -55,7 +55,7 @@ Restart Cursor. The plugin adds the `retoucher` MCP server, the skills, and a ho
 
 ### 2. Figma plugin
 
-Retoucher is waiting for Figma Community review, so for now the Figma plugin comes with the agent plugin. Ask your agent for its path (`retoucher figma-plugin` in Claude Code, the `figma_plugin_path` tool in Codex and Cursor) and import that `manifest.json` in the Figma desktop app: **Plugins → Development → Import plugin from manifest…**. Then run it from **Plugins → Development → Retoucher**. The first time it connects, the panel pairs with the bridge on your computer (see *Privacy*).
+Install [Retoucher from Figma Community](https://www.figma.com/community/plugin/1696122599848660328/retoucher) and run it from Figma's plugins. The first time it connects, the panel pairs with the bridge on your computer (see *Privacy*).
 
 ### 3. Start watching
 
