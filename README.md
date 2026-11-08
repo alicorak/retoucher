@@ -66,7 +66,7 @@ The panel's top-right tells you where things stand:
 
 | Panel | Meaning |
 | --- | --- |
-| 🟢 Claude ready | An agent is watching; notes are picked up right away |
+| 🟢 Ready | An agent is watching; notes are picked up right away |
 | 🟡 Not watching | The bridge runs, but no agent watches. Notes wait until you start watching |
 | 🔴 Not connected | No agent session is open (opening one starts the bridge), or the agent plugin isn't installed |
 | Not paired | Another Figma panel is paired with this bridge; ask the agent to run `retoucher unpair` |

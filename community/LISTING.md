@@ -51,6 +51,7 @@ Free and open source (MIT): https://github.com/alicorak/retoucher
 
 Paste the newest one into *Final details* when publishing a new version.
 
+- **0.8.6:** New panel design. Text job Undo now restores the original when several changes touched the same layer.
 - **0.8.4:** Small mode. The button next to the status shrinks the panel to a small bar that shows when a note needs your answer or is in progress; click it to open the panel again. Retoucher opens the way you left it.
 - **0.8.3:** Setup steps in the panel when no coding agent is connected yet, clearer listing.
 
