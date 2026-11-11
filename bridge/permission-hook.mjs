@@ -3,7 +3,7 @@
 // only while the panel is open and Claude is working on a note; otherwise, or after WAIT_MS without an answer, it
 // prints nothing and Claude Code asks in the terminal as usual. The designer decides every request, except plain
 // `retoucher …` calls (the plugin's own CLI, which only talks to the local bridge), which are allowed without asking.
-import { readStdin, noteInPanel, askPanel } from './hook-lib.mjs';
+import { readStdin, noteInPanel, askPanel, plainCommand } from './hook-lib.mjs';
 const WAIT_MS = 110_000; // keep under the hook's timeout in hooks.json
 
 const out = decision => { process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision } })); process.exit(0); };
@@ -37,27 +37,7 @@ function alwaysRule(tool, suggestions) {
 }
 
 // The plugin's own `retoucher` command only talks to the local bridge, so a plain `retoucher …` call is allowed without asking.
-// Plain means one command: no ; & | < > or backticks, and no $( or ${ outside single quotes.
-function plainCli(cmd) {
-  if (!/^(retoucher|fa)(\s|$)/.test(cmd)) return false; // fa: the name before 0.8.1
-  let q = null; // the quote we are inside: ' " or $' (ANSI-C)
-  for (let i = 0; i < cmd.length; i++) {
-    const c = cmd[i], next = cmd[i + 1];
-    if (q === "'") { if (c === "'") q = null; continue; }
-    if (q === "$'") { if (c === '\\') i++; else if (c === "'") q = null; continue; }
-    if (q === '"') {
-      if (c === '\\') { i++; continue; }
-      if (c === '"') q = null;
-      else if (c === '`' || (c === '$' && (next === '(' || next === '{'))) return false;
-      continue;
-    }
-    if (c === '\\') { i++; continue; }
-    if (c === "'" || c === '"') { q = c; continue; }
-    if (c === '$' && next === "'") { q = "$'"; i++; continue; }
-    if (';&|<>`\n\r'.includes(c) || c === '$') return false;
-  }
-  return q === null;
-}
+const plainCli = cmd => /^(retoucher|fa)(\s|$)/.test(cmd) && plainCommand(cmd); // fa: the name before 0.8.1
 
 const input = JSON.parse((await readStdin()) || '{}');
 const tool = input.tool_name || '';

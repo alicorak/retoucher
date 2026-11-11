@@ -1,4 +1,4 @@
-// Shared by the Claude Code hooks: talk to the bridge, find the note being worked on, wait for the panel's answer.
+// Shared by the hooks (Claude Code, Codex, Cursor): talk to the bridge, find the note being worked on, wait for the panel's answer.
 export const BASE = `http://localhost:${process.env.FA_PORT || 4747}`;
 
 export const readStdin = () => new Promise(r => { let s = ''; process.stdin.on('data', c => (s += c)); process.stdin.on('end', () => r(s)); });
@@ -31,4 +31,25 @@ export async function askPanel(body, waitMs) {
   }
   try { await get(`/permissions/${p.id}/expire`, { method: 'POST' }); } catch {}
   return null;
+}
+
+// Plain means one command: no ; & | < > or backticks, and no $( or ${ outside single quotes.
+export function plainCommand(cmd) {
+  let q = null; // the quote we are inside: ' " or $' (ANSI-C)
+  for (let i = 0; i < cmd.length; i++) {
+    const c = cmd[i], next = cmd[i + 1];
+    if (q === "'") { if (c === "'") q = null; continue; }
+    if (q === "$'") { if (c === '\\') i++; else if (c === "'") q = null; continue; }
+    if (q === '"') {
+      if (c === '\\') { i++; continue; }
+      if (c === '"') q = null;
+      else if (c === '`' || (c === '$' && (next === '(' || next === '{'))) return false;
+      continue;
+    }
+    if (c === '\\') { i++; continue; }
+    if (c === "'" || c === '"') { q = c; continue; }
+    if (c === '$' && next === "'") { q = "$'"; i++; continue; }
+    if (';&|<>`\n\r'.includes(c) || c === '$') return false;
+  }
+  return q === null;
 }

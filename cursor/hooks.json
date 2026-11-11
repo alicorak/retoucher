@@ -7,6 +7,13 @@
         "timeout": 120,
         "failClosed": true
       }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "node \"${CURSOR_PLUGIN_ROOT:-.}/bridge/cursor-hook.mjs\"",
+        "timeout": 120,
+        "failClosed": true
+      }
     ]
   }
 }
